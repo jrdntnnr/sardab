@@ -153,7 +153,7 @@ static void test_matrix(void)
     for (i = 0; i < NELEM(DST_V12); i++)
         ok &= str_eq(N_MDST[i], DST_V12[i]);
     check("SRC / DST lists only grew: every stored value keeps its name (S&H SLEW, DEPTH appended)",
-          ok && MS_SH == 9 && MS_SLEW == 10 && MS_N == 11 && MD_DEPTH == 20 && MD_N == 23 /* (1.5.6: VEL TIME, #213) */ &&
+          ok && MS_SH == 9 && MS_SLEW == 10 && MS_N == 12 && MD_DEPTH == 20 && MD_N == 23 /* (1.5.6: VEL TIME, #213) */ &&
           str_eq(N_MSRC[MS_SH], "S&H") && str_eq(N_MSRC[MS_SLEW], "SLEW") && str_eq(N_MDST[MD_DEPTH], "DEPTH") &&
           TP[P_M1SRC].max == MS_N - 1 && TP[P_M1DST].max == MD_N - 1);
     check("DST names: DEPTH is not an engine parameter (E1..E8 only)", str_eq(mod_dst_name(t, MD_DEPTH), "DEPTH") &&
@@ -269,7 +269,7 @@ static void test_matrix(void)
     mod_begin(t);
     check("no DEPTH slot: the LFO untouched (track_render leaves it alone)", mod.ldep == 32767);
     mod_end(t);
-    slot(t, 0, 11, MD_CUT, 40);                           /* past the lists: nothing */
+    slot(t, 0, MS_N, MD_CUT, 40);                           /* past the lists: nothing */
     slot(t, 1, MS_LFO, MD_N, 40);
     mod_begin(t);
     check("a SRC / DST past the lists does nothing", mod.cut == 0 && mod.nk == 0 && mod.nv == 0);
@@ -512,7 +512,7 @@ static void test_spread(void)
 
     check("SPRD: a track parameter 0..127, default 0 (as before), id 95 (1.5: the INSERT, TYPE and ESYNC after it, P_TC0 103, P_E0 117, P_COUNT 125)",
           TP[P_SPRD].min == 0 && TP[P_SPRD].max == 127 && TP[P_SPRD].def == 0 && P_SPRD == 95 && P_SPRD + 8 == P_TC0 &&
-          P_E0 == 118 && P_COUNT == 127 && str_eq(TP[P_SPRD].label, "SPRD") && motion_param(P_SPRD));
+          P_E0 == 118 && P_COUNT == 128 && str_eq(TP[P_SPRD].label, "SPRD") && motion_param(P_SPRD));
     h1 = phrase_child(0, 1, sp_mono0);
     h2 = phrase_child(0, 1, sp_mono127);
     check("MONO: SPRD 127 plays bit for bit as SPRD 0 (one voice: on PAN)", h1 && h1 == h2);

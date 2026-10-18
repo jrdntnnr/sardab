@@ -106,6 +106,7 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
     fm1_audio_ack_aux(p);
     if (p & FM1_AUDIO_HALF) {
         uint32_t half = fm1_audio_free_half(), b, us;
+        fm1_audio_ack_half();
         int32_t *o = &abuf[half * HALF_WORDS];
         if (shed_req) {
             shed_req = 0;
@@ -120,7 +121,6 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
 #endif
             audio_block(o + 2u * b, CTL);
         }
-        fm1_audio_ack_half();
         audio_halves++;
         us = shed_check(fm1_ticks() - t0);
         if (us > audio_max_us)

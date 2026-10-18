@@ -34,7 +34,7 @@ static uint8_t mc_host, mc_host_cpu;     /* tests: 1 = jobs handed over (run at 
                                   * by default; replaced by FM6, its sounds convert (fm4_convert.c) */
 #endif
 #ifndef GHOULBOX_VERSION
-#define GHOULBOX_VERSION "2.1-dune"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
+#define GHOULBOX_VERSION "2.3.2-dune"   /* GHOULBOX's own: the ABOUT screen; the editor's version string ends " GB" it */
 #endif
 #define NENGINES 15u             /* SLICE 13 (reserved without FELUCCA_SLICE: never offered), GURDY 14 (GHOULBOX):
                                   * every engine keeps its number in every build */
@@ -100,6 +100,7 @@ enum {                          /* per-track parameters */
     P_E0, P_E1, P_E2, P_E3, P_E4, P_E5, P_E6, P_E7,
     P_CANON,                     /* GHOULBOX desert: the CANON playhead (seq.c canon_enter); appended after P_E7
                                   * (project.c byte 111, params_by_count's extras) */
+    P_RING,                     /* appended: keep all SARDAB tuning/engine IDs stable */
     P_COUNT
 };
 #define P_ELOOP P_ED_FX                /* GHOULBOX desert (JIANT 0.4): ENV LOOP, OFF / ON (voice.c env_tick) */
@@ -129,6 +130,7 @@ enum {                          /* global parameters */
                                  * KOCT KTRK's octave (0..4: -2..+2). Appended: FUN10's tail (project.c PROJ_KEYS_OFF) */
     G_DPIT, G_DSPRY,            /* GHOULBOX desert (JIANT): the delay's grains, PITCH semitones and SPRAY (fx.c
                                  * dly_grain). Appended: the three bytes before KEYS' (project.c PROJ_DESERT_OFF) */
+    G_DREAM, G_DDENS, G_DDRFT, G_DMOOD, /* HOME > DREAM */
     G_COUNT
 };
 
@@ -151,9 +153,11 @@ static void params_by_count(int16_t *out, const int16_t *in, uint32_t np, const 
  * Its magic/version distinguishes it from Felucca's unrelated 103-parameter layout. */
 /* Ghoulbox 2.x FUNA / preset v4-v5, np=112: TEMP occupied our TC0.
  * Its dungeon scales used IDs 16..18; preserve their pitch masks explicitly. */
-static void params_ghoul2(int16_t *out, const int16_t *in, const int16_t *def)
+static void params_ghoul2(int16_t *out, const int16_t *in, uint32_t np, const int16_t *def)
 {
-    params_by_count(out, in, 112u, def);
+    params_by_count(out, in, np, def);
+    out[P_RING] = np == 113u ? in[104] : def[P_RING];
+    out[P_TC1] = def[P_TC1];
     out[P_TC0] = def[P_TC0];
     out[P_TEMP] = in[103];
     if (in[P_SCALE] >= 16 && in[P_SCALE] <= 18) {
@@ -215,6 +219,7 @@ typedef struct {
     uint8_t stage;               /* env: 0 off, 1 attack, 2 decay/sustain, 3 release, 4 given up (fading) */
     uint8_t kfade;               /* (JIANT 0.6.74) stage 4: the fade's blocks so far (voice.c env_tick) */
     uint8_t side;                /* SPREAD (fx.c mix_spread): 0 left of PAN, 1 right; set as the voice starts */
+    uint8_t ring;                /* GURDY melody level while its drones ring */
     int32_t env;                 /* Q24 */
     int32_t env_out;             /* last control-rate amplitude, Q15 */
     int32_t pitch16, pitch_cur;  /* 1/16 semitone, with glide */
@@ -366,7 +371,7 @@ static void step_set_nudge(step_t *s, int32_t v)
 }
 #define MOTION_MAX 128u          /* 1.2 (FUN10): 64 before */
 /* Four tracks x64 steps fit one byte. Values retain their signed parameter range (-64..127: an int8_t, 1.2).
- * param: the P_* id (< 128: P_COUNT is at most 127, project.c), bit 7 (MOTION_LOCK, 1.1) a parameter lock: the value
+ * param: the P_* id (< 128: P_COUNT is at most 128, project.c), bit 7 (MOTION_LOCK, 1.1) a parameter lock: the value
  * sounds on that step only and goes back after it (motion.c motion_step); without it an automation event, the
  * value holds until another one changes it. One record per (track, step, id), of either kind */
 #define MOTION_LOCK 0x80u

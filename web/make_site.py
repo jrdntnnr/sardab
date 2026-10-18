@@ -75,6 +75,8 @@ def main(pkg, version, out):
     for doc in ("LICENSE", "LICENSING.md"):
         shutil.copy(HERE.parent / doc, fw / doc)
     shutil.copy(HERE / "editor.html", ed / "index.html")
+    for folder in (inst, ed):
+        shutil.copy(HERE / "sardab-theme.css", folder / "sardab-theme.css")
     for f in ("fukiai.ttf", "FUKIAI-LICENSE.txt", "fm1backup.js", "scala.js", "desert.js"):
         if (HERE / f).exists():
             shutil.copy(HERE / f, ed / f)

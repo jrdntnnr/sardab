@@ -133,3 +133,34 @@ one. These files are not CC0 or GPL. [Recording pages and source hashes](assets/
 and [credits and modification notice](assets/desert/README.md#persian-tar--cc-by)
 must travel with redistributed Tar banks. The bank uses public AAC previews,
 trimmed, resampled, pitch-calibrated and ADPCM-encoded.
+
+## Contact velocity
+
+The weak-drive key sensing and PA10 top-key probe in
+`firmware/hal/fm1_velocity.h` and the deferred ADC setup are adapted from
+[Charles Vestal's fm1-velocity](https://github.com/charlesvestal/fm1-velocity/tree/8f62ce0d968c91ce8bfdafbb908f81d15351650a),
+GPL-3.0-only, on the Felucca HAL by Leo Kuroshita / Hügelton Instruments.
+`firmware/src/key_velocity.h` implements SARDAB's bounded manual response and
+note-on scheduling using that sensing method; Velo's lab synth and unfinished
+adaptive calibration are not included. These additions are GPL-3.0-only.
+
+## October 2026 upstream ports
+
+- JIANT `8c334da`: bounded COMB output and grain-boundary pitch updates; `d05e199` / `21b29e7`: smooth NOISE modulation and AMP triode/cabinet processing. SARDAB adapts AMP to its existing INSERT controls. `ae72e01`: staggered LED mid-level pulses. GPL-3.0; source: <https://github.com/juanjiant-bit/JIANT>.
+- Melodee `007e44e` / `0c21568`: backup-capability detection and verified stock restoration with our application-only loader. GPL-3.0; source: <https://github.com/keremimo/melodee>.
+- SLOOP `3a1350e`: K-weighted level matching and per-file attenuation. Its sample-loop workflow informed SARDAB's loop controls. GPL-3.0; source: <https://github.com/isod89/sloop-fm1>.
+- Felucca-Engines `e88bc70` / `7511c0a`: defined wrapping/shift arithmetic, adapted into the existing GPL engine files; MIT, <https://github.com/hugelton/Felucca-Engines>. The parent Felucca attribution remains in the source headers.
+- GHOULBOX through `8711711`: emulator portable backups, MIDI panel controls, focus mode, mobile audio recovery and recording/export; GPL-3.0, <https://github.com/jasonpersinger/ghoulbox-fm1-dungeon-synth>. X0X `a4777af` informed minimum-width phone controls.
+
+The emulator's separately loaded codecs are browser-only dependencies:
+
+| Component | Licence | Licence text |
+| --- | --- | --- |
+| libflac.js 5.6.0 wrapper | MIT | `LICENSES/MIT-libflac.js.txt` |
+| libFLAC 1.3.4 | BSD-3-Clause | `LICENSES/BSD-3-Clause-libFLAC.txt` |
+| wasm-media-encoders 0.7.0 wrapper | MIT | `LICENSES/MIT-wasm-media-encoders.txt` |
+| LAME MP3 codec | LGPL-2.0-or-later | `LICENSES/LGPL-2.0-LAME.txt`, `LICENSES/LAME-NOTICE.txt` |
+
+Exact codec source revisions, build links, hashes and replacement instructions are in
+`web/emu/vendor/README.md`, distributed beside the built modules. LAME stays a separate,
+replaceable WASM file; no codec is linked into the firmware or audio worklet.

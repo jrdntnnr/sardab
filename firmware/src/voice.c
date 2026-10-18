@@ -145,8 +145,8 @@ static uint32_t voice_victim(const track_t *self, int soft, track_t **pp)
             uint32_t c;
             if (!v->active || v->stage == 4u)
                 continue;
-            if (!v->gate)
-                c = 1;                                  /* released */
+            if (!v->gate && v->stage == 3u)
+                c = 1;                                  /* released (GHOULBOX: not a GURDY's ringing drones: held) */
             else if (mode != V_POLY && i > 0)
                 c = 2;                                  /* extra UNISON, or a voice left by a mode / cap change */
             else if (!soft && mode == V_POLY && i != low && (nlt > LT_KEEP || !lt_voice(t, v)))
@@ -449,6 +449,15 @@ static void trk_note_on(track_t *t, uint32_t note, uint32_t vel)
     }
 }
 
+/* a note's end: the release, or (GHOULBOX 2.3: RING) a GURDY's drones ringing on at the sustain, the voice kept (gate 0,
+ * stage 1 / 2: only RING makes that); eng_gurdy.c fades its melody string and releases it once RING stops */
+static void voice_release(track_t *t, voice_t *v)
+{
+    v->gate = 0;
+    if (!gurdy_rings(t))
+        v->stage = 3;
+}
+
 static void trk_note_off(track_t *t, uint32_t note)
 {
     uint32_t i, k = 0, mode = trk_vmode(t);
@@ -469,19 +478,15 @@ static void trk_note_off(track_t *t, uint32_t note)
                 mono_play(t, next, t->v[0].vel, 0, t->p[P_GLIDE] != 0);
             } else {
                 for (i = 0; i < nv; i++)
-                    if (t->v[i].gate) {
-                        t->v[i].gate = 0;
-                        t->v[i].stage = 3;
-                    }
+                    if (t->v[i].gate)
+                        voice_release(t, &t->v[i]);
                 t->mono_note = 0;
             }
         }
     }
     for (i = 0; i < NVOICE; i++)                        /* a fallback above already has its new pitch */
-        if (t->v[i].note == note && t->v[i].gate) {
-            t->v[i].gate = 0;
-            t->v[i].stage = 3;
-        }
+        if (t->v[i].note == note && t->v[i].gate)
+            voice_release(t, &t->v[i]);
 }
 
 static void trk_all_off(track_t *t)
@@ -694,10 +699,12 @@ static __attribute__((noinline)) uint32_t track_comb(track_t *t, int32_t *out, u
     for (i = 0; i < n; i++) {
         uint32_t d = per >> 8;
         int32_t a = b[(w - d) & (COMB_LEN - 1u)], c = b[(w - d - 1u) & (COMB_LEN - 1u)];
-        int32_t x = (a + (((c - a) * (int32_t)(per & 255u)) >> 8)) << 1, y = out[i] + mulq15(x, fb);
+        int32_t x = (a + (((c - a) * (int32_t)(per & 255u)) >> 8)) * 2, y = out[i] + mulq15(x, fb);
         b[w & (COMB_LEN - 1u)] = (int16_t)clamp(y >> 1, -32768, 32767);
         w++;
-        out[i] = soft_knee(mulq15(y, g) * 2 + (out[i] >> 2), 24000);
+        /* JIANT 8c334da: loud summed voices must not overflow y * g. */
+        y = clamp(y, -262000, 262000);
+        out[i] = soft_knee((((y >> 2) * g) >> 15) * 8 + (out[i] >> 2), 24000);
         loud |= (uint32_t)(out[i] + 16) > 32u;
     }
     comb_w[ti] = (uint16_t)w;

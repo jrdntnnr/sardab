@@ -211,14 +211,14 @@ static int repeat_mode(void)
 {
     int bad = 0; ui_power_on(); track_t *t = &trk[0];
     t->p[P_AMODE] = 6; t->p[P_AOCT] = 4; t->p[P_APROB] = 127;
-    arp_add(t, 72); arp_add(t, 60);
+    arp_add(t, 72, 100); arp_add(t, 60, 100);
     arp_tick(t, CTL);
     bad += check("REPEAT retriggers the last played note without octave traversal", t->arp_note == 60);
     t->arp_pos = 0xFFFFFFF; arp_tick(t, CTL);
     bad += check("REPEAT remains on the same note on the next pulse", t->arp_note == 60);
     arp_remove(t, 60); arp_remove(t, 72); arp_tick(t, CTL);
     bad += check("REPEAT releases after the last held key is released", !t->nheld && !t->arp_note);
-    t->p[P_AHOLD] = 1; arp_add(t, 65); arp_remove(t, 65); t->arp_pos = 0xFFFFFFF; arp_tick(t, CTL);
+    t->p[P_AHOLD] = 1; arp_add(t, 65, 100); arp_remove(t, 65); t->arp_pos = 0xFFFFFFF; arp_tick(t, CTL);
     bad += check("REPEAT supports ARP HOLD", t->nheld == 1u && t->arp_note == 65);
     return bad;
 }
@@ -233,7 +233,7 @@ static void arp_fresh(track_t *t, int32_t mode, int32_t oct, const uint8_t *note
     t->nheld = 0; t->arp_phys = 0;
     t->p[P_AMODE] = (int16_t)mode; t->p[P_AOCT] = (int16_t)oct; t->p[P_APROB] = 127;
     for (i = 0; i < n; i++)
-        arp_add(t, notes[i]);
+        arp_add(t, notes[i], 100);
 }
 static int arp_plays(track_t *t, const uint8_t *want, uint32_t n)   /* the next n steps play these notes */
 {
@@ -288,7 +288,7 @@ static int arp_new_modes(void)
     t->p[P_AORDER] = 1;
     arp_fresh(t, AM_ORD, 1, GCE, 3);  ok &= arp_plays(t, (const uint8_t[]){67, 60, 64}, 3);
     t->p[P_AORDER] = 0;
-    arp_fresh(t, AM_ORD, 1, GCE, 3);  arp_remove(t, 60); arp_add(t, 62);   /* C let go, D pressed: G E D */
+    arp_fresh(t, AM_ORD, 1, GCE, 3);  arp_remove(t, 60); arp_add(t, 62, 100);   /* C let go, D pressed: G E D */
     ok &= arp_plays(t, (const uint8_t[]){67, 64, 62, 67}, 4);
     bad += check("ARP ORD (1.2): G C E pressed play G C E (not C E G), across OCT 2, either ORD switch; a new note last", ok);
     arp_fresh(t, AM_DNUP, 1, CEG, 3);  ok = arp_plays(t, (const uint8_t[]){67, 64, 60, 64, 67, 64}, 6);
@@ -385,7 +385,7 @@ static int arp_new_modes(void)
     arp_fresh(t, AM_PINKY, 1, CEG, 3);
     arp_remove(t, 60); arp_remove(t, 64); arp_remove(t, 67);
     ok = t->nheld == 3u && arp_plays(t, (const uint8_t[]){60, 67, 64, 67}, 4);
-    arp_add(t, 62); arp_add(t, 65); arp_add(t, 69);   /* D F A: replaces it, from the top of the pattern */
+    arp_add(t, 62, 100); arp_add(t, 65, 100); arp_add(t, 69, 100);   /* D F A: replaces it, from the top of the pattern */
     ok &= t->nheld == 3u && arp_plays(t, (const uint8_t[]){62, 69, 65, 69}, 4);
     arp_remove(t, 62); arp_remove(t, 65); arp_remove(t, 69);
     t->p[P_AHOLD] = 0;

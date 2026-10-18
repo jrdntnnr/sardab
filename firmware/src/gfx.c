@@ -85,7 +85,7 @@ static struct {
     uint16_t bg, surf, text, theme, accent;
     uint16_t mid, dim, line, sel, tint, ink, rec, raise, key, lane, grid;
     uint16_t stone, edge;        /* GHOULBOX: the stone's specks, a window's outer line */
-    uint8_t light, mono;
+    uint8_t light, mono, sardab;
     uint8_t style;               /* MENU > STYLE (ui.c style_apply): ST_FLAT, ST_LINE */
     uint32_t gen;                /* bumped by palette_set (the text ramps follow) */
 } ux;
@@ -140,6 +140,7 @@ static void palette_set(uint32_t i)
 {
     const ui_pal_t *p = &UI_PALETTES[i % NPALETTES];
     i %= NPALETTES;
+    ux.sardab = i == UI_SARDAB_INDEX;
     ux.mono = i == UI_GREY_INDEX;
     ux.bg = p->bg; ux.surf = ux.style ? p->bg : p->surf; ux.text = p->text; ux.theme = p->theme; ux.accent = p->accent;
     ux.mid = ux_mix(p->bg, p->text, UI_MID_PCT);
@@ -153,6 +154,7 @@ static void palette_set(uint32_t i)
     ux.lane = ux_mix(ux.surf, p->theme, 10);
     ux.grid = ux_mix(ux.surf, p->text, 6);
     ux.stone = ux_mix(ux.surf, p->bg, 45);               /* GHOULBOX: the stone's specks, a window's outer line */
+    if (ux.sardab) ux.stone = ux_mix(ux.surf, p->theme, 10); /* subtle Bayer ground, below label contrast */
     ux.edge = ux_mix(p->bg, p->theme, 45);
     ux.light = ux_luma(p->bg) > 128u;
     ux.rec = ux.mono ? p->accent : ux.light ? UI_REC_LIGHT : UI_REC_DARK;
@@ -251,10 +253,29 @@ static void cv_frame(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
     cv_rect(x + w - 1, y, 1, h, c);
 }
 
+/* One static 4x4 ordered matrix for surfaces (1/16), rules (8/16), keys (12/16).
+ * Phase belongs to the canvas coordinates, including a clipped strip's offset:
+ * repainting a region never moves the pattern. No animation, bitmap or float. */
+static void cv_bayer(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t a, uint16_t b,
+                     uint32_t level, int32_t ox, int32_t oy)
+{
+    static const uint8_t B[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+    int32_t i, j;
+    for (j = 0; j < h; j++)
+        for (i = 0; i < w; i++)
+            cv_pset(x + i, y + j, B[(((uint32_t)(y + j + cv_oy + oy) & 3u) << 2) |
+                                     ((uint32_t)(x + i + ox) & 3u)] < level ? b : a);
+    GFX_HOOK_PIXELS((uint32_t)(w * h));
+}
+
 /* GHOULBOX: stone, SURF with STONE specks (about 1 in 8). The pattern is a pure function of the position in the
  * caller's coordinates plus (ox, oy), so a redraw matches and a window drawn as two canvases has no seam */
 static void cv_stone(int32_t x, int32_t y, int32_t w, int32_t h, int32_t ox, int32_t oy)
 {
+    if (ux.sardab) {
+        cv_bayer(x, y, w, h, T_SURF, T_STONE, 1, ox, oy);
+        return;
+    }
     int32_t i, j;
     uint16_t s = swap16(T_SURF), k = swap16(T_STONE);
     for (j = 0; j < h; j++) {
@@ -279,18 +300,30 @@ static void cv_stone(int32_t x, int32_t y, int32_t w, int32_t h, int32_t ox, int
 static void cv_window(int32_t x, int32_t y, int32_t w, int32_t h, int32_t border)
 {
     int32_t b = border == 1 ? 1 : 3;
-    cv_stone(x + b, y + b, w - 2 * b, h - 2 * b, 0, 0);
-    if (b == 3) {
+    if (ux.sardab && (w < 100 || h < 60))
+        cv_rect(x + b, y + b, w - 2 * b, h - 2 * b, T_SURF); /* solid parameter cards */
+    else
+        cv_stone(x + b, y + b, w - 2 * b, h - 2 * b, 0, 0);
+    if (ux.sardab) {
+        /* Quiet architectural frame, within the same content bounds. */
+        cv_frame(x, y, w, h, T_EDGE);
+        cv_rect(x, y, 6, 1, T_THEME);
+        cv_rect(x + w - 6, y + h - 1, 6, 1, T_THEME);
+        if (b == 3)
+            cv_bayer(x + 8, y + h - 2, w - 16, 1, T_EDGE, T_THEME, 8, 0, 0);
+    } else if (b == 3) {
         cv_frame(x, y, w, h, T_EDGE);
         cv_frame(x + 1, y + 1, w - 2, h - 2, T_STONE);
         cv_frame(x + 2, y + 2, w - 4, h - 4, T_THEME);
     } else {
         cv_frame(x, y, w, h, T_THEME);
     }
-    cv_rect(x, y, b, b, T_ACCENT);
-    cv_rect(x + w - b, y, b, b, T_ACCENT);
-    cv_rect(x, y + h - b, b, b, T_ACCENT);
-    cv_rect(x + w - b, y + h - b, b, b, T_ACCENT);
+    if (!ux.sardab) {
+        cv_rect(x, y, b, b, T_ACCENT);
+        cv_rect(x + w - b, y, b, b, T_ACCENT);
+        cv_rect(x, y + h - b, b, b, T_ACCENT);
+        cv_rect(x + w - b, y + h - b, b, b, T_ACCENT);
+    }
     if (b == 3)                                         /* (the lint: text inside stays off the border; a thin window's */
         GFX_HOOK_CELL(x + b, y + b + cv_oy, x + w - b, y + h - b + cv_oy);   /* 1 px lines lie in its icons' empty */
     else                                                /* margins (24 px icons: ink rows 3..20), so its cell is the */
@@ -313,6 +346,12 @@ static void cv_sprite(int32_t x, int32_t y, const char *const *rows, uint32_t h,
 /* GHOULBOX: the sword cursor, 14 x 7, pointing right: pommel and grip (EDGE), guard (THEME), blade (TEXT) */
 static int32_t cv_sword(int32_t x, int32_t y)
 {
+    if (ux.sardab) {
+        cv_rect(x + 4, y, 2, 7, T_ACCENT);
+        cv_rect(x + 6, y, 5, 1, T_ACCENT);
+        cv_rect(x + 6, y + 6, 5, 1, T_ACCENT);
+        return 14;
+    }
     static const char *const R[7] = {"....2.........",
                                      "....2.........",
                                      "....2.0000000.",
@@ -779,6 +818,8 @@ static int32_t cv_keycap(int32_t x, int32_t y, uint32_t id, uint16_t fill, uint1
     int32_t w = kc_w(id < KC_COUNT ? id : 0u);
     GFX_HOOK_INK(ink, fill);
     cv_rrect(x, y, w, KC_H, KC_R, fill, under);
+    if (ux.sardab)
+        cv_bayer(x + KC_R, y + KC_H - 2, w - 2 * KC_R, 1, fill, under, 8, 0, 0);
     cv_text_flags(x + ink_in(&AF_S, k->label, w), y + CAP_IN(S, KC_H), &AF_S, k->label, ink, fill, 16u);
     if (x < 0 || x + w > (int32_t)cv_w || y + cv_oy < 0 || y + KC_H + cv_oy > (int32_t)cv_h)
         GFX_HOOK_TEXT(x, y + cv_oy, x + w, y + KC_H + cv_oy, k->label, 6u);      /* the pill: cut by the canvas */

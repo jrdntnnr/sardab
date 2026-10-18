@@ -18,6 +18,8 @@ static struct {
     uint32_t dly_w, cho_w, cho_ph;
     uint32_t gr_ph, gr_sp[2];            /* GHOULBOX desert: the GRAIN delay (dly_grain): grain 0's phase (Q16), each
                                           * grain's spray (samples) */
+    int32_t gr_s[2];
+    uint8_t gr_ready;
     int32_t dly_lp;
     int32_t dl_s1, dl_s2;                /* GHOULBOX desert: the delay read point (Q12 samples) on its way to G_DTIME's,
                                           * two poles (DLY_SLEW): a time change bends the echoes' pitch like a tape
@@ -779,18 +781,25 @@ static const uint32_t GR_RATIO[25] = {32768, 34716, 36781, 38968, 41285, 43740, 
 static __attribute__((noinline)) int32_t dly_grain(uint32_t dl)
 {
     int32_t s = (int32_t)GR_RATIO[clamp(song.g[G_DPIT], -12, 12) + 12] - 65536, x = 0;
-    uint32_t e = (GR_LEN * (uint32_t)(s < 0 ? -s : s)) >> 8, j;   /* the read point's sweep over a grain, Q8 */
+    uint32_t j;
+    if (!fx.gr_ready) {
+        fx.gr_s[0] = fx.gr_s[1] = s;
+        fx.gr_ready = 1;
+    }   /* the read point's sweep over a grain, Q8 */
     fx.gr_ph = (fx.gr_ph + 65536u / GR_LEN) & 0xFFFFu;
     for (j = 0; j < 2u; j++) {
         uint32_t ph = (fx.gr_ph + j * 32768u) & 0xFFFFu, d, di, gl = dl;
         int32_t a, b, w;
-        if (ph < 65536u / GR_LEN) {                     /* this grain starts again: its spray */
+        uint32_t e;
+        if (ph < 65536u / GR_LEN) {                     /* zero-weight boundary: latch pitch and spray */
+            fx.gr_s[j] = s;
             fx.gr_sp[j] = song.g[G_DSPRY] ? rng() % ((uint32_t)song.g[G_DSPRY] * 64u + 1u) : 0u;
         }
         if (gl + fx.gr_sp[j] > DLY_LEN - 2u - GR_LEN * 2u) {   /* a long TIME (the whole line): room for the sweep */
             gl = DLY_LEN - 2u - GR_LEN * 2u - fx.gr_sp[j];
         }
-        d = ((gl + fx.gr_sp[j]) << 8) + ((e * ((s > 0 ? 65535u - ph : ph) >> 4)) >> 12);   /* Q8: up, the delay shrinks
+        e = (GR_LEN * (uint32_t)(fx.gr_s[j] < 0 ? -fx.gr_s[j] : fx.gr_s[j])) >> 8;
+        d = ((gl + fx.gr_sp[j]) << 8) + ((e * ((fx.gr_s[j] > 0 ? 65535u - ph : ph) >> 4)) >> 12);   /* Q8: up, the delay shrinks
                                                          * over the grain; down, it grows */
         di = d >> 8;
         if (di > DLY_LEN - 2u) {
@@ -812,6 +821,7 @@ static void fx_buses(const int32_t *cho_in, const int32_t *dly_in, const int32_t
     int32_t dmix = song.g[G_DMIX] * 258;
     int32_t gr = song.g[G_DPIT] || song.g[G_DSPRY];     /* the GRAIN delay (dly_grain) */
     int32_t cdepth = song.g[G_CDEPTH] * 6, rt;
+    if (!gr) fx.gr_ready = 0;
     uint32_t cinc = LFO_INC[song.g[G_CRATE] & 127] / CTL;
     int zc = blk_zero(cho_in, n), zd = blk_zero(dly_in, n), zr = blk_zero(rev_in, n);
     if (pf.ew1 && fb < THR_FB)
@@ -949,7 +959,7 @@ static __attribute__((noinline)) void rev_side_mix(int32_t *l, int32_t *r, uint3
  * recordings) comes after, so its edges stay sharp (no flanger feedback or phaser ringing smears them) and a STUT
  * repeats the processed sound. State in the pool, per track (ins[], 580 B each); noinline, its own loops: the audio
  * ISR's inlined path gains one test per part (track_t ins_run) */
-enum { IT_OFF, IT_SOFT, IT_HARD, IT_FOLD, IT_FUZZ, IT_CRUSH, IT_PHASER, IT_FLANGER, IT_CHORUS, IT_N };
+enum { IT_OFF, IT_SOFT, IT_HARD, IT_FOLD, IT_FUZZ, IT_CRUSH, IT_PHASER, IT_FLANGER, IT_CHORUS, IT_AMP, IT_N };
 #define IL_LEN 256u                     /* FLANG / CHOR: the line, samples (a power of 2: masked) */
 static const uint8_t INS_HOLD[16] = {64, 48, 40, 32, 24, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1};   /* CRUSH RATE */
 typedef struct {
@@ -976,6 +986,10 @@ static int32_t ins_lpk(int32_t c)
 static inline int32_t ins_shape(uint32_t ty, int32_t v, uint32_t sh)
 {
     switch (ty) {
+    case IT_AMP: {                                   /* static approximation for the transfer display */
+        int32_t a = softclip(clamp(v + (v >> 1), -400000, 400000) + 7000) - softclip(7000);
+        return softclip(a * 4 - 3500) - softclip(-3500);
+    }
     case IT_SOFT:
         return softclip(v);
     case IT_HARD:
@@ -1087,6 +1101,34 @@ static __attribute__((noinline)) void ins_swept(ins_t *s, const track_t *t, int3
     }
 }
 
+/* AMP after JIANT d05e199: two biased triodes, coupling high-pass and cabinet.
+ * Lives in INSERT so SARDAB's parameter IDs and old DIST sounds stay intact.
+ * Uses the swept effect's otherwise idle px/py state, no extra pool allocation. */
+static __attribute__((noinline)) void ins_amp(ins_t *s, const track_t *t, int32_t *b, uint32_t n, int32_t tw)
+{
+    uint32_t i;
+    int32_t drive = t->p[P_IA], g = 4096 + drive * drive * 2;
+    int32_t k = 9000 + t->p[P_IB] * 86, level = LEVEL_Q12[t->p[P_IC] & 127];
+    for (i = 0; i < n; i++) {
+        int32_t x = b[i], y, v, hp;
+        s->w += clamp(tw - s->w, -SL_SLOPE, SL_SLOPE);
+        s->hp += (x - s->hp + 64) >> 7;
+        v = ((clamp(x - s->hp, -230000, 230000) >> 2) * g) >> 10;
+        y = softclip(clamp(v + (v >> 1), -400000, 400000) + 7000) - softclip(7000);
+        s->px[0] += (y - s->px[0]) >> 6;
+        y = softclip((((y - s->px[0]) * (24 + drive)) >> 4) - 3500) - softclip(-3500);
+        s->lp1 += mulq15(y - s->lp1, k);
+        s->lp2 += mulq15(s->lp1 - s->lp2, k);
+        hp = s->lp2 - s->px[1] - mulq15(s->py[1], 21000);
+        s->py[1] = clamp(s->py[1] + mulq15(hp, 8400), -90000, 90000);
+        s->px[1] = clamp(s->px[1] + mulq15(s->py[1], 8400), -90000, 90000);
+        y = s->lp2 + mulq15(s->py[1], 19660);
+        y = (mulq15(y, 24000 - drive * 70) * level) >> 12;
+        s->dc += ((y * 256) - s->dc) >> 9;
+        b[i] = pf_mix(x, y - (s->dc >> 8), s->w);
+    }
+}
+
 /* the INSERT at rest at once (mix_part: TYPE turned OFF while the part was silent, its fade never ran) */
 static __attribute__((noinline)) void ins_rest(track_t *t)
 {
@@ -1110,7 +1152,9 @@ static __attribute__((noinline)) void track_insert(track_t *t, int32_t *b, uint3
         memset(s, 0, sizeof *s);                        /* starting: no stale line or filter */
         s->type = (uint8_t)ty;
     }
-    if (s->type >= IT_PHASER)
+    if (s->type == IT_AMP)
+        ins_amp(s, t, b, n, tw);
+    else if (s->type >= IT_PHASER)
         ins_swept(s, t, b, n, tw);
     else
         ins_drive(s, t, b, n, tw);
@@ -1689,6 +1733,7 @@ static void mix_block(int32_t *out, uint32_t n)
     int32_t mg = fx_usb_fixed ? MASTER_FULL : (int32_t)song.master_q12;   /* (USB LEVEL FIXED: MASTER after) */
     for (i = 0; i < n; i++)
         send_c[i] = send_d[i] = send_r[i] = mix_l[i] = mix_r[i] = 0;
+    mns_clk++;
     events_block(n);
     perf = perf_begin(n);                               /* the FX hold layer at work (perform.c) */
     if (!mc_off && mc_live()) {                         /* (JIANT 0.6.71) core 1 at its parts meanwhile */

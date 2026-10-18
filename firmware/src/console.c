@@ -211,6 +211,10 @@ static void con_status(void)
 #endif
     con_kv("track", (int32_t)song.sel + 1);
     con_kv("batt_raw", song.batt_raw);
+#ifdef FM1_KEY_VELOCITY
+    con_kv("velocity_config", (int32_t)kv_config);
+    con_kv("velocity_adc_timeouts", (int32_t)fm1_kv.timeouts);
+#endif
     con_kv("ustack_free", (int32_t)felucca_dbg.ustack_free);   /* bytes never touched (main.c stack_scan) */
     con_kv("sstack_free", (int32_t)felucca_dbg.sstack_free);
     con_puts("engine ");

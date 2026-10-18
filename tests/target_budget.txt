@@ -66,3 +66,16 @@ master_block 259
 texture_mix 48
 cave_gen 257
 texture_gen 954
+
+# SARDAB contact velocity: isolated routines (2026-10-16); ISR budgets unchanged.
+keyboard_block 212
+kv_keys 138
+fm1_kv_finish 81
+fm1_kv_contacts 28
+fm1_kv_start 9
+fm1_kv_drive 0
+
+# October ports: new AMP and grain routines; previous budgets unchanged.
+ins_amp 147
+dly_grain 77
+mod_tsrc 0

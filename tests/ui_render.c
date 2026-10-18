@@ -667,7 +667,8 @@ enum { S_HOME, S_HOME_IDLE, S_MESSAGE, S_MESSAGE_KEY, S_MESSAGE_NOFILE, S_PRESET
        S_DLY_DOT, S_DLY_DOT16, S_FX_THROW,
        S_DETAIL, S_DETAIL_PLAYING, S_DETAIL_REST, S_DETAIL_DRUM, S_ROLL_MARKS, S_DRUM_MARKS, S_RAST, S_TUNE1, S_TUNE2, S_TUNE3, S_CHORD_RAST, S_HEAD_MSG, S_SHUR, S_DETAIL_COND, S_DETAIL_FILL, S_AUTO_COND, S_GLO_FILL, S_SEQ_EUCLID, S_SEQ_EUCLID_DRUM, S_SEQ_EUCLID_64,
        S_MENU_SELECT, S_PROJECT_ERASE, S_CONFIRM_ERASE_PROJ, S_TOOLS_CLEAN, S_CONFIRM_CLEAN,
-       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD, S_COUNT };
+       S_MENU_MIDI_TRACK, S_MENU_MIDI_TCH_UNUSED, S_MENU_MIDI_AUTO, S_HOME_TRACKS_MIDI, S_MIXER_MIDI, S_EDIT_PHASE_FOLD,
+       S_RAST_PLAY, S_TUNE_TOTAL, S_DESERT, S_DESERT_MISSING, S_DESERT_READY, S_DESERT_OTHER, S_COUNT };
 static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "message_key", "message_nofile", "presets", "presets_nofav", "user",
     "phrases", "project", "tools", "song_empty", "song", "step", "auto_steps", "auto_add_chance", "automation", "drum",
     "drum_hand", "drum_cym", "mixer", "mixer_from_home", "mixer_pan", "env", "env_dest", "lfo", "mod", "fx", "slicer", "dly", "scl", "chord", "chord_wide", "chord_off", "chord_kit", "arp",
@@ -698,7 +699,8 @@ static const char *const S_NAME[S_COUNT] = {"home", "home_idle", "message", "mes
     "detail_cond", "detail_fill", "auto_cond", "layer_glo_fill", "layer_seq_euclid", "layer_seq_euclid_drum",
     "layer_seq_euclid_64",
     "menu_select", "project_erase", "confirm_erase_project", "tools_clean", "confirm_clean",
-    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold"};
+    "menu_midi_track", "menu_midi_channels_unused", "menu_midi_auto_select", "home_tracks_midi", "mixer_midi", "edit_phase_fold",
+    "rast_play", "tune_total", "desert", "desert_missing", "desert_ready", "desert_other"};
 
 /* the STEP page's piano roll (ui_graph.c graph_roll) on track 1, stopped unless said: an empty pattern; ACID in
  * A minor; POLY chords (Am7 F C G, tied); a line with ties, slides and accents in C major; LEN 32 on its second
@@ -1013,6 +1015,44 @@ static void setup(int s)
     case S_DLY: go_title("DLY"); break;
     case S_SCL: TSEL->p[P_SCALE] = 2; go_title("SCL"); break;
     case S_RAST: TSEL->p[P_ROOT] = 0; TSEL->p[P_SCALE] = 16; go_title("SCL"); break;
+    case S_RAST_PLAY:
+        TSEL->p[P_ROOT] = 0; TSEL->p[P_SCALE] = 16; go_title("SCL");
+        memset(TSEL->v, 0, sizeof TSEL->v);
+        TSEL->v[0] = (voice_t){.note=60, .active=1, .gate=1, .age=1};
+        TSEL->v[1] = (voice_t){.note=64, .active=1, .gate=1, .age=3};
+        TSEL->v[2] = (voice_t){.note=67, .active=1, .gate=1, .age=2};
+        break;
+    case S_TUNE_TOTAL:
+        TSEL->p[P_ROOT] = 2; TSEL->p[P_SCALE] = 16;
+        TSEL->p[P_TC4] = -63; TSEL->p[P_TEMP] = 2;
+        go_title("TUNE 2"); ui.hot_col = 0; ui.hot_t = 30;
+        break;
+    case S_DESERT: case S_DESERT_MISSING: case S_DESERT_READY: case S_DESERT_OTHER: {
+        uint32_t k;
+        memset(host_slots, 0, sizeof host_slots);
+        for (k = 0; k < SMP_USER_SLOTS; k++) smp_user_scan(k);
+        list_set(1u + CAT_DESERT);
+        if (s == S_DESERT) {
+            uint32_t n, total, pe;
+            preset_pos(&total);
+            for (n = 0; n < total; n++) { pe = preset_at(n, &k); if (pe != ENGI_SAMPLE) break; }
+            if (n < total) preset_go(n);
+        }
+        else if (s != S_DESERT_OTHER) {
+            eng(ENGI_SAMPLE);
+            for (k = 0; k < ENG_SAMPLE.npresets && ENG_SAMPLE.presets[k].e[0] != SMP_USR_V0; k++) ;
+            apply_preset(k);
+            if (s == S_DESERT_READY) {
+                smp_user_hdr_t *h = (smp_user_hdr_t *)host_slots;
+                h->magic = SMP_USER_MAGIC; h->version = 1; h->nz = 1; h->data_len = 2;
+                memcpy(h->name, "DUNE TAR", 8);
+                h->zone[0] = (smp_zone_t){.n=4, .le=3, .rate=32768, .root16=960, .hi=127};
+                smp_user_scan(0);
+            }
+        }
+        go_page(GR_BROWSE); ui.msg_t = 0;
+        break;
+    }
     case S_SHUR:                                        /* an appended scale (ID after CUSTOM) on D, its lowered fifth */
         TSEL->p[P_ROOT] = 2;
         for (TSEL->p[P_SCALE] = 0; TSEL->p[P_SCALE] < (int16_t)NELEM(N_SCALE) - 1 && strcmp(N_SCALE[TSEL->p[P_SCALE]], "SHUR2"); TSEL->p[P_SCALE]++)

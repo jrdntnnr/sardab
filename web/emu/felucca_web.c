@@ -225,6 +225,12 @@ static fm1_crash_t fm1_crash;                     /* (none: main.c boot_leds run
 static struct { uint8_t p3_rst, wdt_con; uint32_t rst_src; } fm1_boot;
 uint32_t _data_start[1], _data_end[1], _data_load[1], _bss_start[1], _bss_end[1];
 uint32_t _pool_start[1], _pool_end[1], _rt_start[1], _rt_end[1], _rt_load[1];
+/* Stand-ins for main.c's device-only linker symbols, also needed by the native
+ * comparison build. web_power_on does not paint or scan hardware CPU stacks. */
+char _ustack_lo[4], _ustack_top[4], _sstack_lo[4], _sstack_top[4];
+static void fm1_core1_stop(void) {}
+static uint8_t fm1_power_ready, fm1_adc_owned;
+static int fm1_power_init(void) { return 0; } /* no physical supply or second core */
 static uint32_t web_master_adc = 700;   /* MASTER, 0..1023 as the ADC reads it */
 enum { FM1_ADC_BATT = 3, FM1_ADC_MASTER = 4 };
 static int32_t fm1_adc_read(uint32_t ch) { return ch == FM1_ADC_MASTER ? (int32_t)web_master_adc : 620; }
@@ -417,6 +423,31 @@ EXPORT void web_boot(void)
         web_power_on();
 }
 
+/* A portable emulator backup carries the live music separately from the flash sectors: unlike the automatic
+ * restore object, it is exact even while playing or during the ten-second autosave quiet period. Import uses the
+ * project format's existing checksum, range and compatibility validation before it touches the running music. */
+static uint8_t web_project_in[3840];
+EXPORT uint8_t *web_project_capture(void)
+{
+    project_capture(&proj_scratch);
+    proj_wire_gen++;
+    return proj_pack(&proj_wire, &proj_scratch) ? proj_wire_u.raw : 0;
+}
+EXPORT uint32_t web_project_size(void) { return sizeof(project_store_t); }
+EXPORT uint8_t *web_project_import_buffer(void) { return web_project_in; }
+EXPORT uint32_t web_project_import_capacity(void) { return sizeof web_project_in; }
+EXPORT uint32_t web_project_validate(uint32_t n)
+{
+    return n <= sizeof web_project_in && proj_import(&proj_scratch, web_project_in, (int)n);
+}
+EXPORT uint32_t web_project_restore(uint32_t n)
+{
+    if (!web_project_validate(n))
+        return 0;
+    proj_bound(&proj_scratch);
+    return project_restore_runtime(&proj_scratch) == 0;
+}
+
 /* input, by the printed labels: buttons bit b = B_FX .. B_OCTUP (panel.c), keys bit k = key k (F3 .. G5),
  * encoders by role (EN_SELECT .. EN_K4), MASTER 0..1023 */
 static uint32_t web_btn_labels, web_key_mask;
@@ -477,11 +508,42 @@ static uint32_t led_keys(const uint8_t *l)
         m |= led_on(l, 14u + k) << k;
     return m;
 }
+
+/* The hardware lights the key that was physically pressed; in the browser, also light the visible keys of the
+ * chord that press generated. Keep this overlay here rather than in ui_input.c so physical FM-1 behaviour is
+ * unchanged. kb_chord / kb_chord2 contain the notes actually started, so MONO, kits, voicings and notes clipped at
+ * the MIDI limits need no special cases. As play_leds does, use the lowest key when quantisation maps several keys
+ * to the same note, and omit chord tones outside the drawn keyboard. */
+static uint32_t web_note_key(const track_t *t, uint32_t note)
+{
+    uint32_t k;
+    for (k = 0; k < 27u; k++)
+        if (kb_map(t, k) == note)
+            return 1u << k;
+    return 0;
+}
+static uint32_t web_chord_keys(void)
+{
+    uint32_t held = web_key_mask & ~kb_layer, k, i, m = 0;
+    if (keys_own())
+        return 0;                                      /* do not draw over a layer, grid, NAME or SLICES map */
+    for (k = 0; k < 27u; k++) {
+        if (!((held >> k) & 1u))
+            continue;
+        if (kb_chn[k] > 1u)
+            for (i = 0; i < kb_chn[k]; i++)
+                m |= web_note_key(&trk[kb_trk[k] % NTRK], kb_chord[k][i]);
+        if (kb_trk2[k] && kb_chn2[k] > 1u)
+            for (i = 0; i < kb_chn2[k]; i++)
+                m |= web_note_key(&trk[(kb_trk2[k] - 1u) % NTRK], kb_chord2[k][i]);
+    }
+    return m;
+}
 EXPORT uint32_t web_lit_buttons(void)
 {
     return led_buttons(fm1_led) | ((fm1_led[LED_PLAY_GREEN >> 3] >> (LED_PLAY_GREEN & 7u)) & 1u) << 14;
 }
-EXPORT uint32_t web_lit_keys(void) { return led_keys(fm1_led); }
+EXPORT uint32_t web_lit_keys(void) { return led_keys(fm1_led) | web_chord_keys(); }
 EXPORT uint32_t web_dim_buttons(void) { return led_buttons(fm1_led_dim); }
 EXPORT uint32_t web_dim_keys(void) { return led_keys(fm1_led_dim); }
 EXPORT uint32_t web_dim_level(void) { return web_dim_lo; }

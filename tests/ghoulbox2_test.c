@@ -44,6 +44,50 @@ static void migration(void)
     assert(v[P_TEMP]==1 && v[P_SCALE]==22 && v[P_TC0]==0 && v[P_E4]==100);
     puts("Ghoulbox 2.1 and previous SARDAB: frozen projects, presets, automation, tuning, texture, KEYS preserved");
 }
+/* Construct the upstream 2.3 wire layout from a frozen 2.1 record: its only
+ * per-track addition is RING at 104 before the eight engine values. */
+static void migration23(void)
+{
+    project_store_t old, st, saved; project_t q,r; up_rec_t u;
+    read_fixture(&old,sizeof old,"tests/fixtures/ghoulbox-2.1.funa");
+    st=old; unsigned stride=112+2+NSTEP*9, pos=68;
+    for(unsigned t=0;t<NTRK;t++) {
+        memcpy(st.raw+pos,old.raw+68+t*stride,104); st.raw[pos+104]=65;
+        memcpy(st.raw+pos+105,old.raw+68+t*stride+104,stride-104); pos+=stride+1;
+    }
+    memcpy(st.raw+pos,old.raw+68+NTRK*stride,sizeof(chain_config_t)+sizeof(motion_store_t));
+    st.raw[66]=113;
+    uint16_t controls=656; memcpy(st.raw+PROJ_FM6_OFF-6,&controls,2);
+    motion_store_t *m=(motion_store_t *)(st.raw+pos+sizeof(chain_config_t));
+    m->event[0].param=(105+4)|MOTION_LOCK;
+    m->event[1].param=104|MOTION_LOCK; m->event[1].value=1;
+    uint32_t hash=proj_hash(st.raw,sizeof st-4);memcpy(st.raw+sizeof st-4,&hash,4);
+    assert(proj_import(&q,&st,sizeof st));
+    assert(q.dream==656 && q.keys && q.g[G_TAPE]==31);
+    for(unsigned t=0;t<NTRK;t++) {
+        assert(q.t[t].p[P_RING]==1 && q.t[t].p[P_TEMP]==1+t%3 && q.t[t].p[P_E4]==100+t);
+        for(unsigned k=P_TC0;k<=P_TC11;k++) assert(!q.t[t].p[k]);
+    }
+    assert(q.motion.event[0].param==(P_E4|MOTION_LOCK));
+    assert(q.motion.event[1].param==(P_RING|MOTION_LOCK));
+    assert(proj_pack(&saved,&q) && proj_import(&r,&saved,sizeof saved));
+    assert(r.dream==q.dream && !memcmp(q.t,r.t,sizeof q.t));
+    read_fixture(&u,sizeof u,"tests/fixtures/ghoulbox-2.1.up4");
+    memmove(u.packed+105,u.packed+104,8);u.packed[104]=65;u.np=113;
+    int16_t v[P_COUNT],def[P_COUNT];
+    for(unsigned i=0;i<P_COUNT;i++)def[i]=param_desc_of(u.engine,i)->def;
+    assert(up_valid(&u));up_params(&u,v,def);
+    assert(v[P_RING]==1 && v[P_TEMP]==1 && v[P_TC0]==0 && v[P_TC1]==0 && v[P_E4]==100);
+    /* Previous SARDAB np127 has the same packed record, without the RING bit or DREAM word. */
+    st=saved;st.raw[66]=127;
+    motion_store_t *legacy=(motion_store_t *)(st.raw+68+NTRK*(PROJ_PARAM_BYTES+2+NSTEP*9)+sizeof(chain_config_t));
+    legacy->event[1].param=P_PAN; /* old firmware had no RING parameter */
+    for(unsigned t=0;t<NTRK;t++) st.raw[68+t*(PROJ_PARAM_BYTES+2+NSTEP*9)+PROJ_TEMP_BYTE]&=~32u;
+    hash=proj_hash(st.raw,sizeof st-4);memcpy(st.raw+sizeof st-4,&hash,4);
+    assert(proj_import(&q,&st,sizeof st) && q.dream==0);
+    for(unsigned t=0;t<NTRK;t++) assert(q.t[t].p[P_RING]==0 && q.t[t].p[P_E4]==100+t);
+    puts("Ghoulbox 2.3: RING/TEMP/engine migration, motion locks, DREAM/KEYS; old SARDAB np127 defaults preserved");
+}
 static void temperament_audio(void)
 {
     /* Independent expected just-intonation offsets, Rast's thirds and sevenths
@@ -71,4 +115,4 @@ static void temperament_audio(void)
     }
     puts("temperaments + maqam + owner trims: simultaneous seventh chord, all tonics, pitch error <0.5ct");
 }
-int main(void){ migration(); temperament_audio(); return 0; }
+int main(void){ migration(); migration23(); temperament_audio(); return 0; }

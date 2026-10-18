@@ -1,5 +1,9 @@
 # SARDAB / سرداب — UI & Visual Identity Specification
 
+> **18 October 2026 update:** the user-approved [Bayer UI](BAYER-UI.md) supersedes
+> the original colour and texture proposals below. SARDAB now defaults to black,
+> blue and red, with static Bayer patterns and no decorative torches.
+
 **Status:** Proposed — design and implementation handoff, not implemented  
 **Date:** 11 October 2026  
 **Repository:** https://github.com/jrdntnnr/sardab  

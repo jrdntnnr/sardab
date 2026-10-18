@@ -416,9 +416,18 @@ static void fm1_led_dim_level(uint32_t lo)
     fm1__br_sel = lo != 0u;
     fm1__mid_n = (uint8_t)(lo ? FM1_LED_MID_N_LO : FM1_LED_MID_N);
 }
+/* After JIANT ae72e01: stagger mid-brightness pulses across columns. Same duty cycle,
+ * fewer simultaneous current pulses. No changes to key/velocity sampling times. */
+static uint32_t fm1__mid_q(uint32_t c)
+{
+    uint32_t q = fm1__mid_ph + c;
+    if (q >= fm1__mid_n) q -= fm1__mid_n;
+    if (q >= fm1__mid_n) q -= fm1__mid_n;
+    return q;
+}
 /* column c's lit lines this frame: lit, a breath's lit frame (not dim), the mid level's lit frame */
 #define FM1__LIT(c) (fm1_led[c] | (fm1__br_lit ? fm1_led_breath[c] & ~fm1_led_dim[c] : 0u) | \
-                     (!fm1__mid_ph ? fm1_led_mid[c] : 0u))
+                     (!fm1__mid_q(c) ? fm1_led_mid[c] : 0u))
 #if FM1_LED_DIM_DIV > 1
 static uint8_t fm1__dim_ph;
 #endif
@@ -519,12 +528,18 @@ static int fm1_led_anim_on(void) { return fm1__an_f != 0u; }
 static void fm1_led_idle_start(uint32_t glow) { fm1__anim_begin(glow, 1); }
 static int fm1_led_idle_on(void) { return fm1__an_f != 0u && fm1__an_idle; }
 static void fm1_led_anim_stop(void) { fm1__an_f = 0; }   /* (the LEDs as the last frame left them: the UI writes them) */
+#ifdef FM1_KEY_VELOCITY
+#include "fm1_velocity.h"
+#endif
 static void fm1_input_tick(void)
 {
     uint32_t p = fm1__tick_col, n = p + 1u == FM1_NCOL ? 0u : p + 1u;
     uint32_t t0 = fm1_ticks(), g = t0 - fm1_in_stat.last, b = 0;
     uint32_t w = 0xFFFFu ^ (1u << n) ^ (n < 2u ? 1u << (11u + n) : 0u), lit, dim = 0, k = fm1__dim_k;
     uint32_t br = 0, kb = 0;
+#ifdef FM1_KEY_VELOCITY
+    fm1_kv_finish();
+#endif
     fm1__led_lines(0);
     fm1_in_stat.last = t0;
     while (b < FM1_GAP_BINS - 1u && g >= (150u * FM1_TICKS_PER_US << b))
@@ -584,6 +599,10 @@ static void fm1_input_tick(void)
         if (fm1__an_f)                             /* the power-on sweep: the next frame's picture */
             fm1__anim_frame();
     }
+    #ifdef FM1_KEY_VELOCITY
+    fm1_kv_contacts(p);
+    fm1_kv_start(n);
+    #endif
     g = fm1_ticks() - t0;
     fm1_in_stat.cost_sum += g;
     fm1_in_stat.ticks++;

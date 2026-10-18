@@ -14,6 +14,8 @@
  * plays are recorded, not the keys held (what plays back is what was heard). A key or MIDI note plays a
  * chord when the track's CHRD is on (chord.c): its notes go through the same input as so many keys. */
 
+#include "key_velocity.h"
+
 #define KB_SILENT 255u
 static uint32_t kb_prev;
 static volatile uint8_t kb_boot_hold;    /* #137: set from power-on to the end of the splash (main.c): the keys sound nothing,
@@ -27,6 +29,7 @@ static uint8_t kb_vel = 100;             /* 1.5.6 (#84): the keys' velocity (MEN
  * note (a CHRD chord's other notes). Out of track_t: its size stays as the audio ISR's trk[] indexing wants it */
 static uint8_t held_key[NTRK][16];
 static int8_t held_dt[NTRK][16];
+static uint8_t held_vel[NTRK][16];      /* attack velocity follows each held note through arp ordering/octaves */
 static uint8_t kb_trk2[27];              /* GHOULBOX 2.1: KEYS LAYER's second track of key k, + 1 (0: none) */
 static volatile uint8_t kb_asleep;       /* MENU > SCREEN OFF (ui.c): the screen dark or waking, a key pressed now only
                                           * wakes it (silent, no layer, its release nothing) */
@@ -190,7 +193,7 @@ static uint32_t kb_map(const track_t *t, uint32_t k)
 #include "chord.c"
 
 /* ------------------------------------------------------------- arp --- */
-static void arp_add(track_t *t, uint32_t note)
+static void arp_add(track_t *t, uint32_t note, uint32_t vel)
 {
     uint32_t i, k = in_key - 1u;
     if (t->p[P_AHOLD] && t->arp_phys == 0u)
@@ -207,6 +210,7 @@ static void arp_add(track_t *t, uint32_t note)
         hk[t->nheld] = in_key && song.grid != 1u && kb_engine(t, k) < 0
                            ? (uint8_t)(in_key | (uint32_t)(song.octave + 3) << 5) : 0u;
         held_dt[trk_index(t)][t->nheld] = (int8_t)(hk[t->nheld] ? (int32_t)note - (int32_t)kb_pitch(t, k, song.octave) : 0);
+        held_vel[trk_index(t)][t->nheld] = (uint8_t)clamp((int32_t)vel, 1, 127);
         t->held[t->nheld++] = (uint8_t)note;
     }
     if (t->nheld == 1u) {
@@ -228,6 +232,7 @@ static void arp_remove(track_t *t, uint32_t note)
         if (t->held[i] != note) {
             hk[k] = hk[i];
             dt[k] = dt[i];
+            held_vel[trk_index(t)][k] = held_vel[trk_index(t)][i];
             t->held[k++] = t->held[i];
         }
     t->nheld = (uint8_t)k;
@@ -269,7 +274,7 @@ static __attribute__((noinline)) void arp_chord_off(track_t *t, int rec)   /* th
         }
 }
 
-static __attribute__((noinline)) void arp_chord(track_t *t, const uint32_t *list, uint32_t n)
+static __attribute__((noinline)) void arp_chord(track_t *t, const uint32_t *list, const uint8_t *vel, uint32_t n)
 {
     uint32_t i, nt, top = 0, o = t->arp_idx % (uint32_t)(t->p[P_AOCT] > 0 ? t->p[P_AOCT] : 1);
     if (n > 4u)
@@ -283,8 +288,8 @@ static __attribute__((noinline)) void arp_chord(track_t *t, const uint32_t *list
         else
             t->arp_ch[i - 1u] = (uint8_t)nt;
         if (rec_on(t))
-            rec_note(t, nt, 100);
-        trk_note_on(t, nt, 100);
+            rec_note(t, nt, vel[i]);
+        trk_note_on(t, nt, vel[i]);
     }
 }
 
@@ -298,14 +303,15 @@ static void arp_silence(track_t *t)              /* the sounding arp note(s) end
 
 /* DRONE (GHOULBOX desert): the lowest key held sounds on (arp_ch[0], a tanbur's open string under the melody), the
  * others arpeggiate UP over it (arp_note). The drone changes with the lowest key; it ends with the keys (arp_off) */
-static __attribute__((noinline)) void arp_drone(track_t *t, const uint32_t *list, uint32_t len, uint32_t period)
+static __attribute__((noinline)) void arp_drone(track_t *t, const uint32_t *list, const uint8_t *vel, uint32_t len, uint32_t period)
 {
-    uint32_t i, lo = list[0], n = 0, up[64];
+    uint32_t i, low = 0, lo, n = 0, up[64];
     for (i = 1; i < len; i++)
-        lo = list[i] < lo ? list[i] : lo;
+        if (list[i] < list[low]) low = i;
+    lo = list[low];
     for (i = 0; i < len; i++)
         if (list[i] != lo)
-            up[n++] = list[i];
+            up[n++] = i;
     if (t->arp_ch[0] != lo) {
         if (t->arp_ch[0]) {
             if (rec_on(t))
@@ -314,8 +320,8 @@ static __attribute__((noinline)) void arp_drone(track_t *t, const uint32_t *list
         }
         t->arp_ch[0] = (uint8_t)lo;
         if (rec_on(t))
-            rec_note(t, lo, 100);
-        trk_note_on(t, lo, 100);
+            rec_note(t, lo, vel[low]);
+        trk_note_on(t, lo, vel[low]);
     }
     if (t->arp_note) {
         if (rec_on(t))
@@ -326,10 +332,11 @@ static __attribute__((noinline)) void arp_drone(track_t *t, const uint32_t *list
     if (!n || (uint32_t)(rng() & 127u) > (uint32_t)t->p[P_APROB])
         return;
     t->arp_off = period * (uint32_t)t->p[P_AGATE] / 128u;
-    t->arp_note = (uint8_t)up[t->arp_idx % n];
+    i = up[t->arp_idx % n];
+    t->arp_note = (uint8_t)list[i];
     if (rec_on(t))
-        rec_note(t, t->arp_note, 100);
-    trk_note_on(t, t->arp_note, 100);
+        rec_note(t, t->arp_note, vel[i]);
+    trk_note_on(t, t->arp_note, vel[i]);
 }
 
 static void arp_off(track_t *t)                  /* the sounding arp note(s) end (a recorded one too) */
@@ -420,9 +427,9 @@ static int click_wanted(void)                  /* CLICK REC: while a track is ar
  * QNT now, the octave it was pressed in; a chord's note as far above it), the rest (MIDI IN) as they came; each once
  * (two keys may meet on one note now), a key silent now (a black key, QNT WHITE since) left out. With nothing changed
  * since the keys were pressed, exactly the list of held[] as before */
-static uint32_t arp_list(const track_t *t, uint32_t *list, uint32_t *cnt)
+static uint32_t arp_list(const track_t *t, uint32_t *list, uint8_t *vel, uint32_t *cnt)
 {
-    uint32_t i, j, n = 0, x, s, last = 0, len = 0, o;
+    uint32_t i, j, n = 0, x, s, last = 0, lastvel = 100, len = 0, o;
     const uint8_t *hk = held_key[trk_index(t)];
     const int8_t *dt = held_dt[trk_index(t)];
     for (i = 0; i < t->nheld; i++) {
@@ -434,10 +441,14 @@ static uint32_t arp_list(const track_t *t, uint32_t *list, uint32_t *cnt)
             x = (uint32_t)clamp((int32_t)x + dt[i], 0, 127);
         }
         last = x;
+        lastvel = held_vel[trk_index(t)][i];
         for (j = 0; j < n && list[j] != x; j++)
             ;
-        if (j == n)
+        if (j == n) {
+            vel[n] = (uint8_t)lastvel;
             list[n++] = x;
+        } else if (lastvel > vel[j])
+            vel[j] = (uint8_t)lastvel;              /* converged notes retain the stronger attack */
     }
     *cnt = n;
     if (!t->p[P_AORDER] && t->p[P_AMODE] != AM_ORD)   /* (ORD: as pressed, held[] keeps that order) */
@@ -446,11 +457,14 @@ static uint32_t arp_list(const track_t *t, uint32_t *list, uint32_t *cnt)
                 x = list[j];
                 list[j] = list[j - 1];
                 list[j - 1] = x;
+                x = vel[j]; vel[j] = vel[j - 1]; vel[j - 1] = (uint8_t)x;
             }
     for (o = 0; o < (uint32_t)t->p[P_AOCT]; o++)
-        for (i = 0; i < n && len < 64u; i++)
+        for (i = 0; i < n && len < 64u; i++) {
+            vel[len] = vel[i];
             list[len++] = clamp((int32_t)list[i] + 12 * (int32_t)o, 0, 127);
-    if (n && t->p[P_AMODE] == AM_REPEAT) { list[0] = last; len = 1; } /* REPEAT: last played note, no octave traversal */
+        }
+    if (n && t->p[P_AMODE] == AM_REPEAT) { list[0] = last; vel[0] = (uint8_t)lastvel; len = 1; } /* REPEAT: last played note, no octave traversal */
     return len;
 }
 
@@ -459,14 +473,15 @@ static uint32_t arp_list(const track_t *t, uint32_t *list, uint32_t *cnt)
 static __attribute__((noinline)) void arp_fire(track_t *t, uint32_t period)
 {
     uint32_t cnt, list[64], len, j;
-    if (!(len = arp_list(t, list, &cnt))) {        /* (every key silent now: QNT WHITE's black keys) */
+    uint8_t vel[64];
+    if (!(len = arp_list(t, list, vel, &cnt))) {        /* (every key silent now: QNT WHITE's black keys) */
         if (t->arp_note)
             arp_off(t);
         return;
     }
     t->arp_idx++;
     if (t->p[P_AMODE] == AM_DRONE) {
-        arp_drone(t, list, len, period);
+        arp_drone(t, list, vel, len, period);
         return;
     }
     j = t->p[P_AMODE] == AM_CHORD ? 0u : arp_pick(t, list, len);
@@ -475,7 +490,7 @@ static __attribute__((noinline)) void arp_fire(track_t *t, uint32_t period)
     if ((uint32_t)(rng() & 127u) <= (uint32_t)t->p[P_APROB]) {
         t->arp_off = period * (uint32_t)t->p[P_AGATE] / 128u;
         if (t->p[P_AMODE] == AM_CHORD) {            /* CHORD: the first 4 notes, an octave up each step */
-            arp_chord(t, list, cnt);
+            arp_chord(t, list, vel, cnt);
             return;
         }
         t->arp_note = (uint8_t)list[j];
@@ -483,8 +498,8 @@ static __attribute__((noinline)) void arp_fire(track_t *t, uint32_t period)
             t->arp_note = (uint8_t)scale_up(t, list[j]);
         }
         if (rec_on(t))
-            rec_note(t, t->arp_note, 100);           /* recording: what the arp plays */
-        trk_note_on(t, t->arp_note, 100);
+            rec_note(t, t->arp_note, vel[j]);           /* recording: what the arp plays */
+        trk_note_on(t, t->arp_note, vel[j]);
     }
 }
 
@@ -732,7 +747,7 @@ static void input_on(track_t *t, uint32_t note, uint32_t vel)
     if (rec_on(t) && !t->p[P_AMODE])               /* (ARP on: arp_tick records its notes) */
         rec_note(t, note, vel);
     if (t->p[P_AMODE])
-        arp_add(t, note);
+        arp_add(t, note, vel);
     else
         trk_note_on(t, note, vel);
 }
@@ -819,7 +834,7 @@ static __attribute__((noinline)) void perf_key_remap(void)
  * own, or KEYS LAYER's second sound) */
 static void key_on_to(uint32_t k, track_t *t, uint32_t note, uint8_t *chord, uint8_t *chn)
 {
-    uint32_t n = chord_build(t, note, chord), i, mc = trk_midi_ch(trk_index(t)), vel = kb_vel;
+    uint32_t n = chord_build(t, note, chord), i, mc = trk_midi_ch(trk_index(t)), vel = (kv_config & 1u) && kv_hw_on && kv_velocity[k] ? kv_velocity[k] : kb_vel;
     *chn = 0;
     in_key = (uint8_t)(k + 1u);
     for (i = 0; i < n; i++) {
@@ -894,9 +909,10 @@ static __attribute__((noinline)) void kb_lat(uint32_t k)
 }
 #endif
 
-static void keyboard_block(void)
+static __attribute__((noinline)) void keyboard_block(void)
 {
-    uint32_t cur = fm1_in.notes, ch, k;
+    uint32_t cur = kv_keys(fm1_in.notes, fm1_ms, kb_vel,
+        kb_boot_hold || kb_asleep || (fm1_in.buttons & kb_mask) || kb_lock || song.grid >= 2u, kb_prev), ch, k;
     uint32_t lay, fx, mute;
     ch = cur ^ kb_prev;                          /* keys also sound while entering steps */
     if (perf_remap)
@@ -912,7 +928,8 @@ static void keyboard_block(void)
     }
     lay = (fm1_in.buttons & kb_mask) || kb_lock;  /* (#83: kb_lock, a layer locked open with no button held) */
     fx = (fm1_in.buttons & perf_mask) || (kb_lock & 2u);
-    mute = song.grid == 2u ? ~0u : song.grid == 3u ? SONG_KEYS : 0u;   /* the keys that never sound here */
+    mute = song.grid == 2u || song.grid == 4u ? ~0u : song.grid == 3u ? SONG_KEYS : 0u;   /* the keys that never sound
+                                                 * here (4: GHOULBOX's DREAM, a key composes) */
     for (k = 0; k < 27u; k++) {
         if (!((ch >> k) & 1u))
             continue;

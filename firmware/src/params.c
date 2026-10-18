@@ -43,6 +43,7 @@ static const param_desc_t ESYNC_DESC[3] = {   /* ATK DEC REL with ENV SYNC on: t
     {"REL", F_INT, 0, 127, 60, ESYNC_NAMES, 0},
 };
 static uint32_t esync_idx(int32_t v) { return (uint32_t)(v & 127) * ESYNC_N >> 7; }   /* (param_format's split) */
+static const char *const N_DMOOD[] = {"MIN", "DOR", "PHRY", "HARM", "MAJ", "MIX", "MAQAM"};   /* GHOULBOX 2.3: DREAM's (dream.c) */
 /* seq.c kb_map; 1 = SNAP (stored projects: the former ON); 3 = SEQ: SNAP, and the sequencer's notes snap too as
  * they play (seq.c seq_step; the steps keep what was written). Append-only: older projects hold 0..2 */
 static const char *const N_QUANT[] = {"OFF", "SNAP", "WHITE", "SEQ", "ALL", "SEQ+T"};   /* ALL (GHOULBOX): keys and range, chromatic
@@ -67,7 +68,7 @@ static const char *const N_GO[] = {"--", "GO"};
 static const char *const N_SLCR[] = {"OFF", "GATE", "STUT"};             /* SL_OFF .. SL_STUT (slicer.c) */
 static const char *const N_SLDIV[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};   /* SL_DEN */
 /* the INSERT's types (1.5, fx.c IT_*; append-only: stored). Its three values A B C mean what the type says (ins_desc) */
-static const char *const N_ITYPE[] = {"OFF", "SOFT", "HARD", "FOLD", "FUZZ", "CRUSH", "PHASR", "FLANG", "CHOR"};
+static const char *const N_ITYPE[] = {"OFF", "SOFT", "HARD", "FOLD", "FUZZ", "CRUSH", "PHASR", "FLANG", "CHOR", "AMP"};
 /* CRUSH: BITS 1..16 and RATE (the held sample's rate, fx.c INS_HOLD) over the range in 16 even parts (0-terminated) */
 static const char *const N_IBITS[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
                                       "16", 0};
@@ -83,7 +84,7 @@ static const char *const N_KOCT[] = {"-2", "-1", "0", "+1", "+2"};
 /* modulation matrix (mod.c): sources, destinations (E1..E8 = P_E0..P_E7: shown with the engine's labels).
  * Append-only (stored values keep their meaning): S&H SLEW and DEPTH (#132) came after EXPR and E8; VEL and TIME
  * (1.5.6, #213: at the note) after DEPTH */
-static const char *const N_MSRC[] = {"OFF", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H", "SLEW"};
+static const char *const N_MSRC[] = {"OFF", "LFO", "ENV", "VEL", "KEY", "RAND", "MODW", "AT", "EXPR", "S&H", "SLEW", "NOISE"};
 static const char *const N_MDST[] = {"OFF", "PITCH", "CUT", "SHP", "AMP", "PAN", "DIST", "CHO", "DLY", "REV", "RATE",
                                      "VIB", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "DEPTH", "VEL", "TIME"};
 static const char *const N_ENGNAME[] = {"ANALOG", FELUCCA_FM4 ? "DIGITAL" : "-", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL", "GRAIN", "PHYS",
@@ -196,22 +197,24 @@ static const param_desc_t TP[P_COUNT] = {
     [P_IMIX] = PD("MIX", F_PCT, 0, 127, 127),
     [P_FTYPE] = PE("TYPE", N_FTYPE, 0),           /* 1.5 (#104): ANALOG's filter, LP = as before (eng_analog.c) */
     [P_ESYNC] = PE("ESYNC", N_ONOFF, 0),          /* 1.5 (#175): OFF = ATK DEC REL in ms, as before (voice.c esync) */
+    [P_RING] = PE("RING", N_ONOFF, 0),
 };
 
 /* the INSERT's A B C as its TYPE means them (TP's ranges and defaults): the drives DRIVE TONE LEVEL, CRUSH BITS RATE
  * LPF, the swept ones RATE DEPTH FDBK; OFF TP's own */
 #define PU(l, f, df, n, u) {l, f, 0, 127, df, n, u}
-static const param_desc_t INS_DESC[3][3] = {
+static const param_desc_t INS_DESC[4][3] = {
     {PU("DRIVE", F_PCT, 64, 0, 0), PU("TONE", F_CUTOFF, 96, 0, 0), PU("LEVEL", F_DB, 96, 0, 0)},
     {PU("BITS", F_INT, 64, N_IBITS, 0), PU("RATE", F_INT, 96, N_IRATE, "Hz"), PU("LPF", F_CUTOFF, 96, 0, 0)},
     {PU("RATE", F_LFOHZ, 64, 0, 0), PU("DEPTH", F_PCT, 96, 0, 0), PU("FDBK", F_PCT, 96, 0, 0)},
+    {PU("DRIVE", F_PCT, 64, 0, 0), PU("TONE", F_PCT, 96, 0, 0), PU("LEVEL", F_DB, 96, 0, 0)},
 };
 #undef PU
 static const param_desc_t *ins_desc(int32_t type, uint32_t k)
 {
     if (type <= 0 || type >= (int32_t)NELEM(N_ITYPE))
         return &TP[P_IA + k];
-    return &INS_DESC[type < 5 ? 0 : type == 5 ? 1 : 2][k];   /* (IT_SOFT .. IT_FUZZ, IT_CRUSH, the swept ones) */
+    return &INS_DESC[type == 9 ? 3 : type < 5 ? 0 : type == 5 ? 1 : 2][k];   /* (IT_SOFT .. IT_FUZZ, IT_CRUSH, the swept ones) */
 }
 
 static const param_desc_t GP[G_COUNT] = {
@@ -263,6 +266,10 @@ static const param_desc_t GP[G_COUNT] = {
     [G_KOCT] = PE("OCT", N_KOCT, 2),               /* (0) */
     [G_DPIT] = PD("PITCH", F_SEMI, -12, 12, 0),    /* GHOULBOX desert (JIANT): the GRAIN delay, each repeat two grains this far up / down */
     [G_DSPRY] = PD("SPRAY", F_PCT, 0, 127, 0),     /* .. their spray: each grain from a random place (both 0: the plain delay) */
+    [G_DREAM] = PE("EVOL", N_ONOFF, 0),            /* GHOULBOX 2.3: HOME > DREAM (dream.c) */
+    [G_DDENS] = PD("DENS", F_INT, 1, 8, 4),
+    [G_DDRFT] = PD("DRFT", F_INT, 1, 8, 6),        /* (a change every 3 passes: ~80 s at 72 BPM) */
+    [G_DMOOD] = PE("MOOD", N_DMOOD, 6),
 };
 
 static const param_desc_t *track_desc(const track_t *t, uint32_t id)
@@ -538,6 +545,7 @@ static const page_t PAGES[] = {
     {"EDIT 1", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E0, P_E1, P_E2, P_E3}},
     {"EDIT 2", FAM_EDIT, SC_ENGINE, GR_NONE, {P_E4, P_E5, P_E6, P_E7}},
     {"FILTER", FAM_EDIT, SC_TRACK, GR_NONE, {P_FTYPE, P_E4, P_E5, P_E6}},   /* ANALOG only (1.5, #104): TYPE CUT RES DRV (E7 is INT now, OSC's) */
+    {"RING", FAM_EDIT, SC_TRACK, GR_NONE, {P_RING, 0xFF, 0xFF, 0xFF}},   /* GHOULBOX 2.3: GURDY only (ui.c page_visible) */
     {"LANES", FAM_EDIT, SC_TRACK, GR_NONE, {P_LN0, P_LN1, P_LN2, P_LN3}},   /* DRUM only: the lane levels */
     {"LANES 2", FAM_EDIT, SC_TRACK, GR_NONE, {P_LN4, P_LN5, P_LN6, P_LN7}},
     {"SLICES", FAM_EDIT, SC_TRACK, GR_SLICES, {0xFF, 0xFF, 0xFF, 0xFF}},   /* SLICE only: the slices by hand (ui_slice.c) */
@@ -575,6 +583,8 @@ static const page_t PAGES[] = {
     {"MIXER", FAM_TRK, SC_TRK, GR_TRK, {0, 1, 2, 3}},
     {"CLOCK", FAM_TRK, SC_GLOBAL, GR_NONE, {G_BPM, G_SWING, G_CLOCK, 0xFF}},
     {"KEYS", FAM_TRK, SC_GLOBAL, GR_NONE, {G_KMODE, G_KTRK, G_KSPLIT, G_KOCT}},   /* GHOULBOX 2.1: CLOCK tapped again */
+    {"DREAM", FAM_TRK, SC_GLOBAL, GR_NONE, {G_DREAM, G_DDENS, G_DDRFT, G_DMOOD}},   /* GHOULBOX 2.3: KEYS tapped again;
+                                                                                    * a key composes (dream.c) */
 };
 #define NPAGES (sizeof(PAGES) / sizeof(PAGES[0]))
 static uint8_t mod_ui_slot;      /* the MOD page: the matrix slot (0..3) KNOB 2..4 edit */

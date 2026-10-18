@@ -1,4 +1,11 @@
-# SARDAB UI — status (UI-0, UI-1)
+# SARDAB UI — status
+
+**18 October 2026:** the approved tuning readout, DESERT preset feedback and
+SARDAB visual cleanup are implemented and rebuilt. The latest build adds the
+[AmbientZero palette and Bayer patterns](BAYER-UI.md), removes torches and verifies
+the browser at desktop and phone sizes. See [DESERT UI](DESERT-UI.md)
+for current screens, controls and validation. Page navigation and knob assignments
+are unchanged. The following records the earlier UI-0/UI-1 work.
 
 Implements stages UI-0 and UI-1 of [SARDAB_UI_SPEC.md](SARDAB_UI_SPEC.md), plus the SCL root marker brought forward from UI-2 (spec 6.3). Waiting for visual sign-off before the rest of UI-2 (redesigning the SCL, TUNE, CHORD and HOME screens). No audio, tuning, scale, project, protocol or preset changes.
 

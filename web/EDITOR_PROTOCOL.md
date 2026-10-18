@@ -1,10 +1,13 @@
 # Felucca editor protocol (SysEx over USB-MIDI)
 
-SARDAB 2.1 retains the command protocol below. Current INFO reports
-P_COUNT=126, P_E0=118, G_COUNT=39 (37, 38: the GRAIN delay's PITCH and SPRAY, GHOULBOX desert). TC0–TC11 remain 103–114, custom masks
-115–116, TEMP is 117, TEXTURE globals remain 27–32, and KEYS uses 33–36.
-NOTE NAMES is appended at menu ID 31; DESERT is sound category 9. Read INFO
-and descriptors rather than assuming the historical counts in examples.
+SARDAB 2.3 uses P_COUNT=128, P_E0=118, G_COUNT=43. INFO's seven-bit
+parameter-count byte is **0 for 128**; parameter IDs remain 0–127. Update clients
+before connecting. TC0–TC11 remain 103–114, masks 115–116, TEMP 117, engine values
+118–125, CANON 126, RING 127. Globals 39–42 are DREAM EVOL/DENS/DRFT/MOOD;
+MAQAM is MOOD 6 (default), retaining Ghoulbox's original mood values 0–5.
+Existing command IDs and v14 values are unchanged. Read DESC for ranges.
+See [integration and storage notes](../docs/GHOULBOX-2.3-PARITY.md).
+
 
 
 **GHOULBOX 1.2-dev:** `INFO` reports P_COUNT 103 and P_E0 95. IDs 83–94 are twelve root-relative cent trims (−63..63); scale ID 26 now has 40 enum entries. `DESC` sends all forty names, so readers must not cap enum strings at 24. Wire command numbers and v14 encoding are unchanged. Projects use GBM1 (3,648 bytes), with legacy FUN8 import; stored preset versions are 6/7. See [microtuning compatibility and controls](../docs/MICROTONAL.md). This extension has host coverage only.

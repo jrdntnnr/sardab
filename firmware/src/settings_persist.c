@@ -112,6 +112,9 @@ static int settings_import(persist_t *p, int n)
 #endif
 #endif
     if (p->panel.magic == PANEL_MAGIC) panel = p->panel;
+#ifdef SARDAB_KEY_VELOCITY
+    kv_config = kv_settings(p->favorites.factory[15]);
+#endif
     return current ? 1 : 2;
 }
 

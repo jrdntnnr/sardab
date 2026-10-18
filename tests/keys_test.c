@@ -238,7 +238,7 @@ int main(void)
     bad += check("secondary arp keeps its octave and source key",
                  trk[1].nheld == 1 && trk[1].held[0] == 74 && held_dt[1][0] == 12);
     trk[1].p[P_TRANS] = 2;
-    { uint32_t notes[64], count; uint32_t n = arp_list(&trk[1], notes, &count);
+    { uint32_t notes[64], count; uint8_t vel[64]; uint32_t n = arp_list(&trk[1], notes, vel, &count);
       bad += check("secondary arp follows its own transpose after entry", n && notes[0] == 76); }
     keys(0); arp_off(&trk[1]);
 

@@ -104,7 +104,7 @@ static void test_drone(void)
     t->nheld = 0;
     t->p[P_AMODE] = AM_DRONE; t->p[P_AOCT] = 1; t->p[P_APROB] = 127; t->p[P_AGATE] = 64;
     for (i = 0; i < 3u; i++)
-        arp_add(t, CEG[i]);
+        arp_add(t, CEG[i], 100);
     for (i = 0; i < 4u; i++) {
         t->arp_pos = 0xFFFFFFF;
         arp_tick(t, CTL);
@@ -115,7 +115,7 @@ static void test_drone(void)
     arp_tick(t, CTL);                                   /* the gate ends */
     cck("ARP DRONE: the gate ends the arpeggiated note, the drone sounds on", t->arp_note == 0 && t->arp_ch[0] == 60);
     t->nheld = 0; t->arp_phys = 0;
-    arp_add(t, D[0]);
+    arp_add(t, D[0], 100);
     t->arp_pos = 0xFFFFFFF;
     arp_tick(t, CTL);
     cck("ARP DRONE: one key: the drone alone, no arp note", t->arp_ch[0] == 62 && t->arp_note == 0);
@@ -162,8 +162,8 @@ static void test_project(void)
     ui_power_on();
     project_capture(&a);
     a.t[1].p[P_CANON] = 5;
-    cck("the project: P_CANON in its byte (np 127), back as saved",
-        proj_pack(&st, &a) && st.raw[66] == 127u && proj_import(&c, &st, sizeof st) && c.t[1].p[P_CANON] == 5 && c.t[0].p[P_CANON] == 0);
+    cck("the project: P_CANON in its byte (np 128), back as saved",
+        proj_pack(&st, &a) && st.raw[66] == 128u && proj_import(&c, &st, sizeof st) && c.t[1].p[P_CANON] == 5 && c.t[0].p[P_CANON] == 0);
     for (i = 0; i < P_COUNT; i++) {
         in[i] = (int16_t)i;
         def[i] = -1;

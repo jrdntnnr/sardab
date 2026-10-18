@@ -7,9 +7,8 @@
  * graph_signature() changes. The look:
  * curves THEME (2 px), guides and empty marks RAISE, captions MID / DIM, the active thing ACCENT,
  * bars rounded; a list's selected row has the sword and ACCENT text (GHOULBOX). */
-static int32_t panel_x0 = 10, panel_w = 220;         /* GHOULBOX: the graphs' inner area (narrower beside torches) */
-#define PANEL_X0 panel_x0                            /* the graphs' inner area: x 10..230, or 24..216 */
-#define PANEL_W panel_w
+#define PANEL_X0 10                                 /* full graph area; no decorative torches */
+#define PANEL_W 220
 #define GOY 11                                       /* graphs drawn on a 100 px scale sit at y 11..111 */
 /* the height ADSR and LFO are drawn on: 100 px, or (MENU > LARGE's strip: draw_graph) the strip's ~ 56 */
 static int32_t graph_ht = 100;
@@ -24,7 +23,7 @@ static void graph_adsr(const track_t *t, uint16_t c)
     int32_t a = 4 + t->p[pg->id[0]] * 50 / 127, d = 6 + t->p[pg->id[1]] * 50 / 127, r = 6 + t->p[pg->id[3]] * 60 / 127;
     int32_t top = 6 * graph_ht / 100, bot = 88 * graph_ht / 100, sus = t->p[pg->id[2]] * 1000 / 127;   /* 0..1000 */
     int32_t x0 = PANEL_X0 + 2, x1 = x0 + a, x3 = PANEL_X0 + PANEL_W - 4 - r, i, px, py;   /* (12 .. 226 at full width;
-                                                                       * GHOULBOX: inside the torches beside them) */
+                                                                       * (the full graph width) */
     int32_t e = 32768;                                                  /* exp(-4.6 u), Q15 */
 #define EGY(lvl) (bot - (lvl) * (bot - top) / 1000)
     cv_rect(PANEL_X0, bot + 2, PANEL_W, 1, T_RAISE);
@@ -407,18 +406,67 @@ static int chord_snap_text(const track_t *t, char *b)
     return 1;
 }
 
+/* Gated voices, after keyboard mapping/chord generation (also MIDI and sequencer).
+ * Low 12 bits: pitch classes; high bits: newest MIDI note + 1. No audio changes. */
+static uint32_t scale_playing(const track_t *t)
+{
+    uint32_t i, bits = 0, age = 0, note = 0;
+    if (t->p[P_MUTE] || t->engine != t->eng_req) return 0;
+    for (i = 0; i < NVOICE; i++) {
+        const voice_t *v = &t->v[i];
+        if (!v->active || !v->gate || v->stage == 4u) continue;
+        bits |= 1u << (v->note % 12u);
+        if (!note || v->age >= age) { age = v->age; note = v->note + 1u; }
+    }
+    return bits | (note << 12);
+}
+
+/* Effective tuning, not just the knob's trim; preserve temperament's 0.1 ct. */
+static void scale_pitch_text(const track_t *t, uint32_t note, int octave, char *b)
+{
+    int32_t dc = tuning_decicents(t, note), a = dc < 0 ? -dc : dc;
+    uint32_t n;
+    if (octave) note_name(b, note);
+    else str_cpy(b, N_NOTE[note % 12u], 4);
+    n = str_len(b); b[n++] = ' ';
+    b[n++] = dc < 0 ? '-' : '+';
+    fmt_int(b + n, a / 10); n = str_len(b);
+    if (a % 10) { b[n++] = '.'; b[n++] = (char)('0' + a % 10); }
+    str_cpy(b + n, " ct", 4);
+}
+
+static uint32_t scale_focus(const track_t *t, uint32_t playing)
+{
+    const page_t *pg = cur_page();
+    if (pg->id[0] >= P_TC0 && pg->id[0] <= P_TC11)
+        return ((uint32_t)t->p[P_ROOT] + pg->id[ui.hot_col & 3u] - P_TC0) % 12u;
+    return playing >> 12 ? (playing >> 12) - 1u : (uint32_t)t->p[P_ROOT];
+}
+
 static void graph_scale(const track_t *t, uint16_t c)
 {
     static const uint8_t BLACK[12] = {0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0};
-    uint32_t i, mask = scale_mask(t);
+    uint32_t i, mask = scale_mask(t), playing = scale_playing(t), focus = scale_focus(t, playing);
+    int trim = cur_page()->id[0] >= P_TC0 && cur_page()->id[0] <= P_TC11;
+    char pitch[24];
+    scale_pitch_text(t, focus, !trim && (playing >> 12), pitch);
+    cv_text_on(12, 0, &AF_M, pitch, T_TEXT, T_SURF);
+    cv_text_r(226, 2, &AF_S, trim ? "TOTAL" : playing >> 12 ? "PLAY" : "ROOT", T_MID, T_SURF);
     for (i = 0; i < 12u; i++) {
         uint32_t deg = (i + 12u - (uint32_t)t->p[P_ROOT]) % 12u;
         int32_t x = 13 + (int32_t)i * 18;
         uint16_t col = (mask >> deg) & 1u ? (deg == 0u ? T_ACCENT : c) : T_RAISE;
-        cv_rrect(x + 3, BLACK[i] ? 6 : 38, 10, 52, 3, col, T_SURF);
+        int32_t ky = BLACK[i] ? 24 : 40;
+        cv_rrect(x + 3, ky, 10, 36, 3, col, T_SURF);
+        if (ux.sardab)
+            cv_bayer(x + 4, ky + 4, 8, 12, T_SURF, col, 12, 0, 0);
+        if (i == focus % 12u)
+            cv_frame(x + 1, ky - 2, 14, 40, T_TEXT);
         if (deg == 0u)
-            cv_diamond(x + 8, BLACK[i] ? 66 : 29, 4, T_ACCENT);
-        int32_t cents = tuning_cents(t, i), y = BLACK[i] ? 43 : 75;
+            cv_diamond(x + 8, BLACK[i] ? 68 : 31, 3, T_ACCENT);
+        if ((playing >> i) & 1u)
+            cv_rect(x + 6, 83, 5, 4, T_ACCENT);
+        int32_t cents = tuning_decicents(t, i), y = ky + 23;
         if (cents) { /* arrows on altered keys: down = flat, up = sharp */
             int32_t tip = y + (cents < 0 ? 5 : -5);
             cv_line(x + 8, y - 5, x + 8, y + 5, T_SURF);
@@ -431,9 +479,10 @@ static void graph_scale(const track_t *t, uint16_t c)
                                          "KEYS + SEQUENCE SNAP", "ALL KEYS: SCALE DEGREES"};
         char b[32];
         int snap = chord_snap_text(t, b);
-        cv_text_in(12, 92, 216, &AF_S, snap ? b : hint[clamp(t->p[P_QUANT], 0, QN_ALL)],
+        cv_text_in(12, 94, 216, &AF_S, snap ? b : hint[clamp(t->p[P_QUANT], 0, QN_ALL)],
                    snap ? T_ACCENT : T_MID, T_SURF);
-    }
+    } else
+        cv_text_in(12, 94, 216, &AF_S, "PRESET + TRIM + TEMPER", T_MID, T_SURF);
 }
 /* CHORD (SCL 2): the chord's name ("Cm7": the last one the track played; before any, the one on its ROOT from
  * C4) over the keys from the C below its lowest note (two octaves, three for a wide one): its notes THEME, its
@@ -485,6 +534,9 @@ static void graph_chord(const track_t *t, uint16_t c)
             on |= nn[j] == note;
         cv_rrect(x, BLACK[note % 12u] ? 36 : 62, (int32_t)w - 2, 48, w > 6u ? 3 : 2,
                  !on ? T_RAISE : note % 12u == (uint32_t)r % 12u ? T_ACCENT : c, T_SURF);
+        if (ux.sardab)
+            cv_bayer(x + 1, (BLACK[note % 12u] ? 36 : 62) + 4, (int32_t)w - 4, 8, T_SURF,
+                     !on ? T_RAISE : note % 12u == (uint32_t)r % 12u ? T_ACCENT : c, 12, 0, 0);
         if (on && tuning_cents(t, note)) {
             int32_t mid = x + ((int32_t)w - 2) / 2;
             int32_t y = BLACK[note % 12u] ? 49 : 75, dy = tuning_cents(t, note) < 0 ? 2 : -2;
@@ -516,13 +568,13 @@ static void graph_insert(const track_t *t, uint16_t c)
     uint32_t sh = ins_bits_sh(t->p[P_IA]);
     cv_rect(PANEL_X0, cy, PANEL_W, 1, T_RAISE);
     cv_line(PANEL_X0 + PANEL_W / 2, cy - a, PANEL_X0 + PANEL_W / 2, cy + a, T_RAISE);
-    if (ty == IT_OFF || ty >= IT_PHASER || !m)
+    if (ty == IT_OFF || (ty >= IT_PHASER && ty <= IT_CHORUS) || !m)
         cv_line(PANEL_X0 + PANEL_W / 6, cy + a, PANEL_X0 + PANEL_W * 5 / 6, cy - a, ty ? T_RAISE : T_DIM);
     if (ty == IT_OFF)
         return;
     for (x = 0; x < PANEL_W; x++) {
         int32_t y, w;
-        if (ty >= IT_PHASER) {                       /* the sweep, two cycles */
+        if ((ty >= IT_PHASER && ty <= IT_CHORUS)) {                       /* the sweep, two cycles */
             uint32_t ph = (uint32_t)x * (0xFFFFFFFFu / (PANEL_W / 2u)), tr = pf_tri(ph);
             w = ty == IT_CHORUS ? osc_sine(ph) * 2 : ty == IT_FLANGER ? (int32_t)((tr * tr) >> 16) * 2 - 65536 : (int32_t)tr * 2 - 65536;
             y = cy - (w >> 1) * a / 32768 * t->p[P_IB] / 127;
@@ -1182,14 +1234,19 @@ static void page_title(char *ti)
 /* the strip's title: L centred (M when L lacks a glyph or is too wide) */
 static void graph_title(void)
 {
-    char ti[20];
+    char ti[24];
     const aafont_t *f = &AF_L;
-    int32_t y;
-    page_title(ti);
+    int32_t y, top = cur_page()->graph == GR_SCALE ? 20 : 0;
+    if (top) {
+        uint32_t playing = scale_playing(TSEL);
+        int trim = cur_page()->id[0] >= P_TC0 && cur_page()->id[0] <= P_TC11;
+        scale_pitch_text(TSEL, scale_focus(TSEL, playing), !trim && (playing >> 12), ti);
+        cv_text_in(12, 4, 216, &AF_S, "TOTAL TUNING", T_MID, T_SURF);
+    } else page_title(ti);
     if (!large_face_has(ti) || text_w(f, ti) > 220)
         f = &AF_M;
-    y = f == &AF_L ? CAP_IN(L, LG_H_GRAPH) : CAP_IN(M, LG_H_GRAPH);
-    GFX_HOOK_ALIGN(0, 0, 240, LG_H_GRAPH, AL_HV, "large strip title centred");
+    y = top + (f == &AF_L ? CAP_IN(L, LG_H_GRAPH - top) : CAP_IN(M, LG_H_GRAPH - top));
+    GFX_HOOK_ALIGN(0, top, 240, LG_H_GRAPH, AL_HV, "large strip title centred");
     cv_text_in(0, y, 240, f, ti, T_THEME, T_SURF);
 }
 
@@ -1201,7 +1258,7 @@ static uint32_t graph_signature(void)
     if (ui.home)
         return h ^ (ui.frame / 2u);                  /* scope: redraw every other frame */
     h ^= (uint32_t)pg->graph * 131u + TSEL->eng_req + song.sel * 7777u + ui.page * 1291u;
-    if (strip_kind() == SK_TITLE)                    /* MENU > LARGE: the page's title (its engine, its number) */
+    if (strip_kind() == SK_TITLE && pg->graph != GR_SCALE)  /* LARGE tuning keeps the live effective offset */
         return h ^ 0x5A17u;
     if (pg->graph == GR_NONE || pg->graph == GR_ARP) h ^= ui.frame / 2u;
     for (i = 0; i < P_COUNT; i++)
@@ -1219,6 +1276,10 @@ static uint32_t graph_signature(void)
     if (pg->graph == GR_SCALE || pg->graph == GR_CHORD)
         h = (h ^ (chord_last[song.sel].input + 131u * chord_last[song.sel].root +
                   65537u * chord_last[song.sel].n)) * 16777619u;
+    if (pg->graph == GR_SCALE)
+        h = (h ^ scale_playing(t) ^ ((ui.hot_col + 1u) << 24)) * 16777619u;
+    if (pg->graph == GR_BROWSE)
+        h = (h ^ smp_user_gen ^ (list_mode() << 24)) * 16777619u;
     if (pg->graph == GR_SONG) {
         h ^= ui.song_row * 40503u + chain_config.count * 7919u + ui.song_trk * 3571u;
         h = fnv(h, chain_config.row, sizeof chain_config.row);
@@ -1355,6 +1416,7 @@ static void panel_alert(uint32_t id, const char *a)
 static void graph_browse(void)
 {
     uint32_t total, cur = preset_pos(&total), e, k;
+    int desert = list_mode() == 1u + CAT_DESERT;
     int32_t row;
     if (!total) {
         char b[24];
@@ -1368,12 +1430,31 @@ static void graph_browse(void)
         panel_note(b, "[K4] ANOTHER LIST", "TAG YOURS WHEN SAVING");
         return;
     }
-    for (row = -3; row <= 3; row++) {
-        int32_t y = LIST_Y(row + 3), x1 = 212;
+    if (desert) {
+        uint32_t code;
+        const char *missing = snd_missing(TSEL, &code);
+        char status[40];
+        cv_text_on(12, 4, &AF_S, "DESERT", T_THEME, T_SURF);
+        cv_text_r(226, 4, &AF_S, cur < total && !preset_cur_hidden() ? "LOADED" : "NOT IN LIST", T_MID, T_SURF);
+        cv_rect(12, 17, 214, 1, T_EDGE);
+        if (missing) {
+            str_cpy(status, missing, 16);
+            str_cpy(status + str_len(status), " MISSING: SINE", 24);
+        } else if (TSEL->eng_req == ENGI_SAMPLE || ENGINES[TSEL->eng_req % NENGINES] == &ENG_GRAIN) {
+            str_cpy(status, SMP_ALL_NAMES[(uint32_t)TSEL->p[P_E0] % SMP_NALL], 16);
+            str_cpy(status + str_len(status), " READY", 24);
+        } else str_cpy(status, "BUILT-IN SOUND", sizeof status);
+        cv_text_in(12, 106, 216, &AF_S, status, missing ? T_ACCENT : T_MID, T_SURF);
+    }
+    for (row = 0; row < (desert ? 5 : 7); row++) {
+        int32_t y = desert ? 20 + 17 * row : LIST_Y(row), x1 = 212;
         char tag[6], nm[13], pt[4], pn[13];
-        uint32_t index = preset_visible(cur, total, (uint32_t)(row + 3));
-        int sel = index == cur;
-        int32_t hint = sel ? preset_pat_hint() : -1;    /* the suggested pattern */
+        uint32_t first = cur < total && cur > 2u ? cur - 2u : 0u;
+        uint32_t last = total > 5u ? total - 5u : 0u;
+        uint32_t index = desert ? (first < last ? first : last) + row : preset_visible(cur, total, (uint32_t)row);
+        int sel = index == cur && !preset_cur_hidden();
+        int32_t hint = sel && !desert ? preset_pat_hint() : -1;    /* the suggested pattern */
+        int missing = 0, sample = 0;
         if (index >= total) continue;
         e = preset_at(index, &k);
         if (e == NENGINES) {                             /* user preset: "U07" and its name */
@@ -1382,12 +1463,30 @@ static void graph_browse(void)
         } else {
             str_cpy(tag, eng_abbr(ENGINES[e]->name), sizeof tag);
             str_cpy(nm, ENGINES[e]->presets[k].name, sizeof nm);
+            if (desert && e == ENGI_SAMPLE) {
+                uint32_t si = (uint32_t)ENGINES[e]->presets[k].e[0] % SMP_NALL;
+                if (si >= SMP_USR_V0 && si < SMP_USR_V0 + SMP_USER_SLOTS) {
+                    uint32_t slot = si - SMP_USR_V0, j;
+                    const smp_user_hdr_t *hdr = (const smp_user_hdr_t *)smp_user_xip(slot);
+                    sample = 1; missing = smp_set_missing(si);
+                    str_cpy(tag, SMP_ALL_NAMES[si], sizeof tag);
+                    if (missing) str_cpy(nm, "NO SAMPLE", sizeof nm);
+                    if (!missing && hdr->name[0]) {
+                        for (j = 0; j < 8u && hdr->name[j]; j++)
+                            nm[j] = hdr->name[j] >= 32 && hdr->name[j] <= 126 ? hdr->name[j] : '?';
+                        nm[j] = 0;
+                    }
+                    x1 = 183;
+                }
+            }
         }
         if (hint >= 0) {
             pat_label((uint32_t)hint, pt, pn);
             x1 = 206 - text_w(&AF_M, pt) - 6;
         }
         list_row(y, sel, tag, T_DIM, nm, T_TEXT, x1);
+        if (sample)
+            cv_text_r(207, y + CAP_IN(S, 16), &AF_S, missing ? "MISS" : "OK", missing ? T_ACCENT : T_MID, T_SURF);
         if (hint >= 0) {
             GFX_HOOK_ALIGN(0, y, 0, y + 16, AL_V, "list row text centred up/down");
             cv_text_r(206, y + LIST_TY, &AF_M, pt, T_ACCENT, T_SURF);
@@ -2246,67 +2345,6 @@ static void graph_song(void)
                      i < 4u ? "[K3] ADD SECTION" : "[SAVE] PROJECT A-D", T_MID, T_SURF, x0 - 10 - SG_X0);
     }
 }
-/* GHOULBOX: a wall torch, 12 x 30: the flame (rows 0..11, frame f 0..3: its tip sways and the core rises), the
- * cup (12..17), the handle (18..29). Colours: ACCENT outer flame, THEME middle, TEXT core, EDGE wood */
-#define TORCH_LX 8
-#define TORCH_RX 220
-#define TORCH_Y 10
-static void torch_draw(int32_t x, int32_t y, uint32_t f)
-{
-    static const uint8_t OUTER[12] = {2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 8, 6};
-    static const uint8_t MIDW[12] = {0, 0, 0, 2, 2, 4, 4, 6, 6, 6, 6, 4};
-    static const uint8_t CORE[12] = {0, 0, 0, 0, 0, 2, 2, 2, 4, 4, 2, 2};
-    static const int8_t SWAY[4] = {-1, 0, 1, 0};
-    int32_t j;
-    for (j = (int32_t)(f & 1u); j < 12; j++) {        /* (odd frames: one row shorter) */
-        int32_t dx = j < 5 ? SWAY[f & 3u] : 0, cx = x + 6 + dx;
-        cv_rect(cx - OUTER[j] / 2, y + j, OUTER[j], 1, T_ACCENT);
-        if (MIDW[j]) cv_rect(cx - MIDW[j] / 2, y + j, MIDW[j], 1, T_THEME);
-        if (CORE[j] && j + (int32_t)(f & 2u) / 2 < 12) cv_rect(cx - CORE[j] / 2, y + j, CORE[j], 1, T_TEXT);
-    }
-    for (j = 0; j < 6; j++)                            /* the cup: narrowing */
-        cv_rect(x + j / 2, y + 12 + j, 12 - (j / 2) * 2, 1, j == 0 ? T_THEME : T_EDGE);
-    cv_rect(x + 4, y + 18, 4, 12, T_EDGE);             /* the handle */
-    cv_rect(x + 5, y + 18, 1, 12, T_STONE);
-    GFX_HOOK_TEXT(x, y + cv_oy, x + 12, y + cv_oy + 30, "torch", 4u);   /* the lint: nothing may overlap it */
-}
-/* the pages whose stage has room for the torches: HOME's scope, the envelope, the LFO, FX, and an engine page
- * that shows the scope (draw_graph's default: not WHEEL's drawbars, a sample, FM6's or DIGITAL's charts) */
-static int torch_page(void)
-{
-    const page_t *pg = cur_page();
-    uint32_t e = TSEL->eng_req % NENGINES;
-    if (large_kind() == LK_TALL)                        /* MENU > LARGE's strip: too short for a 30 px torch */
-        return 0;
-    if (ui.home)
-        return 1;
-    switch (pg->graph) {
-    case GR_ADSR: case GR_LFO: case GR_FX:              /* (not SLICER: its 16 columns span the stage) */
-        return 1;
-    case GR_NONE:
-        return !(pg->scope == SC_ENGINE && (ENGINES[e] == &ENG_WHEEL || (ENGINES[e] == &ENG_SAMPLE && sample_wave.ready) ||
-                                            e == ENGI_FM6 || (FELUCCA_FM4 && e == ENGI_DIGITAL))) &&
-               !(FELUCCA_FM4 && pg->id[0] == P_FM1_LEVEL && e == ENGI_DIGITAL);
-    default:
-        return 0;
-    }
-}
-static void torch_tick(void)                          /* only the two torch rectangles, every 8 UI frames */
-{
-    uint32_t f = (ui.frame >> 3) & 3u;
-    if (!ui.torches || f == ui.torch_f)
-        return;
-    ui.torch_f = (uint8_t)f;
-    cv_begin(12, 30, T_SURF);
-    cv_stone(0, 0, 12, 30, TORCH_LX, TORCH_Y);
-    torch_draw(0, 0, f);
-    cv_blit(TORCH_LX, graph_y() + TORCH_Y);
-    cv_begin(12, 30, T_SURF);
-    cv_stone(0, 0, 12, 30, TORCH_RX, TORCH_Y);
-    torch_draw(0, 0, f ^ 2u);                          /* (the other one out of step) */
-    cv_blit(TORCH_RX, graph_y() + TORCH_Y);
-}
-
 static void draw_graph(void)
 {
     const page_t *pg = cur_page();
@@ -2314,7 +2352,6 @@ static void draw_graph(void)
     uint16_t c = ACC;
     uint32_t sig;
     if (!ui.home && pg->graph == GR_TRK) {
-        ui.torches = 0;
         draw_tracks();
         return;
     }
@@ -2330,14 +2367,6 @@ static void draw_graph(void)
     cv_begin(240, graph_h(), T_BG);
     cv_window(3, 0, 234, graph_h(), 3);              /* the panel: GHOULBOX's stone window (MENU > LARGE: the strip) */
     cv_bg = T_SURF;                                  /* (text drawn with cv_text lands on it) */
-    ui.torches = (uint8_t)torch_page();              /* GHOULBOX: the torches, and the graphs' area beside them */
-    panel_x0 = ui.torches ? 24 : 10;
-    panel_w = ui.torches ? 192 : 220;
-    if (ui.torches) {
-        ui.torch_f = (uint8_t)((ui.frame >> 3) & 3u);
-        torch_draw(TORCH_LX, TORCH_Y, ui.torch_f);
-        torch_draw(TORCH_RX, TORCH_Y, ui.torch_f ^ 2u);
-    }
     cv_oy = GOY;                                     /* graphs on a 100 px scale */
     if (strip_kind() != SK_NONE) {                   /* MENU > LARGE: the strip */
         uint32_t k = strip_kind();

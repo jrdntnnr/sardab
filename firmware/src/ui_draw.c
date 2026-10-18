@@ -668,7 +668,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
                         int32_t ratio, uint32_t icon)
 {
     char key[48];
-    int hot = c == ui.hot_col && ui.hot_t, named = fmt_named, mot = card_mot_next && label[0], strip, snap;
+    int hot = c == ui.hot_col && ui.hot_t, named = fmt_named, mot = card_mot_next && label[0], snap;
     uint32_t kind = large_kind();                       /* MENU > LARGE: tall (draw_column_tall), or the label in M */
     uint8_t sig;
     uint16_t lc = hot ? T_ACCENT : T_MID;
@@ -710,20 +710,11 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
     snap = ui.force || sig != ui.roll[c].sig;           /* what the value is of: label, unit, track, engine, palette */
     if (kind == LK_TALL)
         ui.roll[c].from[0] = 0;                         /* (a tall card: no rolling digits) */
-    strip = !snap && str_eq(key, ui.col[c]);
-    if (strip && !ui.roll[c].from[0])
+    if (!snap && str_eq(key, ui.col[c]) && !ui.roll[c].from[0])
         return;
-    if (strip) {                                        /* rolling: the value strip only */
-        cv_begin(COL_W, ROLL_H, T_SURF);
-        cv_stone(3, 0, COL_W - 6, ROLL_H, 0, ROLL_Y);   /* GHOULBOX: the window's stone and side borders, as drawn */
-        cv_rect(0, 0, 1, ROLL_H, T_EDGE);
-        cv_rect(1, 0, 1, ROLL_H, T_STONE);
-        cv_rect(2, 0, 1, ROLL_H, T_THEME);
-        cv_rect(COL_W - 3, 0, 1, ROLL_H, T_THEME);
-        cv_rect(COL_W - 2, 0, 1, ROLL_H, T_STONE);
-        cv_rect(COL_W - 1, 0, 1, ROLL_H, T_EDGE);
-        cv_oy = -ROLL_Y;
-    } else {
+    /* Redraw the card during a roll: the label's antialiased descenders may
+     * enter its window. This keeps animated and forced redraws identical. */
+    {
         char ov[16];                                    /* the value drawn before (in the cache key) */
         const char *k = ui.col[c];
         uint32_t i = 0;
@@ -746,7 +737,7 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
         cv_window(0, 0, COL_W, COL_H, 3);               /* GHOULBOX: a stone window */
     }
     if (label[0] || val[0]) {
-        if (!strip && label[0]) {
+        if (label[0]) {
             /* MENU > LARGE on a list / graph page or a layer (LK_LABEL): the label in M where it fits the card (its
              * capitals rows 5..15, the icon on them when it fits too), else in S as without LARGE */
             const aafont_t *lf = kind == LK_LABEL && 5 + text_w(&AF_M, label) <= COL_W - 2 ? &AF_M : &AF_S;
@@ -789,14 +780,14 @@ static void draw_column(uint32_t c, const char *label, const char *val, const ch
             cv_text_on(x + ug, vf == &AF_M ? 17 + AF_M.asc - AF_S.asc : 20, &AF_S, unit, T_MID, T_SURF);   /* on the value's
                                                                  * baseline (S; GHOULBOX: from the faces' ascents) */
         }
-        if (!strip && ratio >= 0) {
+        if (ratio >= 0) {
             int32_t gw = COL_W - 10, fx = ratio * gw / 1000;
             cv_rrect(5, 38, gw, 3, 1, ux.style ? T_LINE : T_BG, T_SURF);   /* (LINE: no card to cut it from) */
             cv_rrect(5, 38, fx < 3 ? 3 : fx, 3, 1, hot ? T_ACCENT : vc == T_DIM ? T_DIM : T_THEME, T_BG);
         }
     }
     cv_oy = 0;
-    cv_blit((uint32_t)CARD_X(c), Y_LABEL + (strip ? ROLL_Y : 0));
+    cv_blit((uint32_t)CARD_X(c), Y_LABEL);
 }
 
 /* an action's column (act_cols): picked, the OCT+ keycap (accent while it would do something); else "--" */
@@ -1355,6 +1346,8 @@ static void draw_columns(void)
         /* Display names only: protocol/library labels SCL and QNT remain stable. */
         const char *label = vp == &TSEL->p[P_SCALE] ? "MAQAM" : vp == &TSEL->p[P_QUANT] ? "MAP" :
                             vp == &TSEL->p[P_CHRD] ? "CHORD" : d->label;
+        if (cur_page()->graph == GR_SCALE && cur_page()->id[c] >= P_TC0 && cur_page()->id[c] <= P_TC11)
+            label = N_NOTE[((uint32_t)TSEL->p[P_ROOT] + cur_page()->id[c] - P_TC0) % 12u];
         if (vp == &TSEL->p[P_QUANT] && *vp == QN_OFF) str_cpy(val, "CHR", sizeof val);
         draw_column(c, label, val, unit, VAL(c), d->fmt == F_ENUM && d->max < 2 ? -1 : RATIO(d, enum_rank(d, *vp)),
                     param_icon(d, *vp));
@@ -1498,6 +1491,14 @@ static void confirm_text(char *a, char *b)
         break;
     case CF_CLEAR_SONG:
         str_cpy(a, "CLEAR SONG ORDER?", 24);
+        break;
+    case CF_DREAM:                                   /* GHOULBOX 2.3: "DREAM IN D DOR?" */
+        str_cpy(a, "DREAM IN ", 24);
+        str_cpy(a + str_len(a), N_GURDY_DRN[k % 12u], 4);
+        str_cpy(a + str_len(a), " ", 2);
+        str_cpy(a + str_len(a), N_DMOOD[clamp(song.g[G_DMOOD], 0, 6)], 6);
+        str_cpy(a + str_len(a), "?", 2);
+        str_cpy(b, "REPLACES ALL 4 TRACKS", 24);
         break;
     case CF_INIT_SOUND:
         str_cpy(a, "INITIALIZE SOUND?", 24);
@@ -1660,7 +1661,6 @@ static void ui_draw_page(uint32_t counting)
     draw_columns();
     felucca_dbg.stage = 5;
     draw_graph();
-    torch_tick();                                       /* GHOULBOX: the flames, between full redraws */
     if (ui.msg_t && !--ui.msg_t && ui.msg2[0]) {     /* the second message (ui_notices) */
         str_cpy(ui.msg, ui.msg2, sizeof ui.msg);
         ui.msg2[0] = 0;

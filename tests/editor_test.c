@@ -170,6 +170,9 @@ static int preferences(void)
     uint8_t a[4] = {0, 7, 0, 0};
     reset();
     uint32_t n = request(ED_INFO, a, 0);
+    uint32_t start=4; while(start<n && host_wire[start]) start++;
+    bad += check("INFO: zero means 128 parameters; IDs 0..127 and G_COUNT 43", host_wire[start+2]==0 && host_wire[start+3]==43);
+
     uint32_t e = n - 3u;                                  /* (1.5.5: 4B 01 NCOND last, below) */
     bad += check("INFO explicitly tags display capabilities after SONG without changing command 33",
         ED_SONG == 33 && ED_UI_STATE == 34 && ED_FAV_SET == 38 &&
@@ -182,7 +185,7 @@ static int preferences(void)
         host_wire[e - 33] == 0 &&                        /* (no bank since 1.0.3) */
         host_wire[e - 32] == 0x53 && host_wire[e - 31] == 1 && host_wire[e - 30] == 3 &&
         host_wire[e - 29] == 0x50 && host_wire[e - 28] == 1 && host_wire[e - 27] == 3 &&   /* FM6 v2: no bank, preset patches */
-        host_wire[e - 26] == 0x4E && host_wire[e - 25] == 1 && host_wire[e - 24] == 33 &&   /* MENU settings: 33 items (1.5.5; GHOULBOX SCENE, NOTE NAMES, no HELP) */
+        host_wire[e - 26] == 0x4E && host_wire[e - 25] == 1 && host_wire[e - 24] == 37 &&   /* MENU settings: 37 items (1.5.5; GHOULBOX SCENE, NOTE NAMES, no HELP) */
         host_wire[e - 23] == 0x52 && host_wire[e - 22] == 1 && host_wire[e - 21] == 4 &&   /* RATCH */
         host_wire[e - 20] == 0x4C && host_wire[e - 19] == 1 && host_wire[e - 18] == 1 &&   /* 1.1 parameter locks */
         host_wire[e - 17] == 0x41 && host_wire[e - 16] == 1 && host_wire[e - 15] == 0 && host_wire[e - 14] == 1 &&   /* 1.2: 128 */
@@ -894,7 +897,7 @@ static uint32_t menu_set(uint32_t id, int32_t v)            /* -> rc; host_wire[
 #define TCH_NAMES "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,OMNI,OFF"
 static int menu_protocol(void)
 {
-    static const char *const WANT[32][2] = {
+    static const char *const WANT[37][2] = {
         {"COLOR", 0}, {"STYLE", "FLAT,LINE"}, {"LARGE", "OFF,ON"}, {"ANIM", "ON,OFF,IDLE"}, {"LEDS", "OFF,DIM LO,DIM HI,INV,INV LO,INV HI"},
         {"HOLD", "0.3 s,0.4 s,0.5 s,0.6 s"}, {"KNOB ACCEL", "OFF,ON"}, {"FX LATCH", "OFF,ON"}, {"BPM LOCK", "OFF,ON"},
         {"SPEAKER EQ", "FLAT,LOWCUT,BASS+"}, {"USB LEVEL", "MASTER,FIXED"}, {"USB SERIAL", "ON,OFF"},
@@ -907,11 +910,11 @@ static int menu_protocol(void)
         {"SELECT", "BPM,PAGE,MODW,VEL"},                                                             /* (1.5.5; 1.5.6 MODW VEL) */
         {"T1 CHANNEL", TCH_NAMES}, {"T2 CHANNEL", TCH_NAMES}, {"T3 CHANNEL", TCH_NAMES}, {"T4 CHANNEL", TCH_NAMES},   /* (1.5.5) */
         {"AUTO SELECT", "OFF,ON"}, {"SCREEN WAKE", "+MIDI,PANEL"},
-        {"SCENE", "DUNGEON,CRYPT,TAVERN,CHAPEL,BLANK,CITADEL"}, {"NOTE NAMES", "ON,OFF"}};   /* (GHOULBOX: 32, 33) */                                  /* (1.5.5) */
-    static const int32_t DEF[33] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0};   /* (COLOR: the default palette) */
-    static const uint8_t TAB[33] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 2, 2, 2, 4, 1, 0, 0, 1, 1, 3, 2, 0, 1, 3, 3, 3, 3, 3, 3, 4, 4};   /* DISPLAY CONTROL AUDIO
+        {"SCENE", "DUNGEON,CRYPT,TAVERN,CHAPEL,BLANK,CITADEL"}, {"NOTE NAMES", "ON,OFF"}, {"VELOCITY", "FIXED,SENSE"}, {"CURVE", "LINEAR,SOFT,HARD"}, {"TOUCH", "NORMAL,LIGHT,FIRM"}, {"TOP KEYS", "PROBE,FIXED"}};   /* (GHOULBOX: 32, 33) */                                  /* (1.5.5) */
+    static const int32_t DEF[37] = {-1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0};   /* (COLOR: the default palette) */
+    static const uint8_t TAB[37] = {0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 2, 2, 2, 4, 1, 0, 0, 1, 1, 3, 2, 0, 1, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5};   /* DISPLAY CONTROL AUDIO
                                                                                                          * MIDI SYSTEM (1.2) */
-    static const char *const TABN[5] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "SYSTEM"};
+    static const char *const TABN[6] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "SYSTEM", "TOUCH"};
     int bad = 0, ok = 1;
     uint32_t i, k, n;
     menu_item_t it;
@@ -920,7 +923,7 @@ static int menu_protocol(void)
     FILE *jf = json ? fopen(json, "w") : 0;
     reset();
     if (jf) fprintf(jf, "[");
-    for (i = 0; i < 32u; i++) {
+    for (i = 0; i < 37u; i++) {
         n = menu_desc(i, &it);
         joined[0] = 0;
         for (k = 0; k < it.nnames; k++) { if (k) strcat(joined, ","); strcat(joined, it.names[k]); }
@@ -942,7 +945,7 @@ static int menu_protocol(void)
         }
     }
     if (jf) { fprintf(jf, "]\n"); fclose(jf); }
-    bad += check("MENU_DESC: 33 items (1.0.4's 12 in the menu's order, then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.3's HOME, 1.5's HELP, 1.5.5's SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE), ids 0..31, names, defaults; TUNE a number -50..50 ct", ok);
+    bad += check("MENU_DESC: 37 items (1.0.4's 12 in the menu's order, then 1.1's CLICK, CLICK LEVEL, COUNT-IN, 1.2's RESTORE LAST, SCALE LEDS, SCREEN OFF, 1.2's SCOPE, STEP PREVIEW, CHORD ENTRY, MIDI IN, TUNE, 1.3's HOME, 1.5's HELP, 1.5.5's SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE), ids 0..36, names, defaults; TUNE a number -50..50 ct", ok);
     bad += check("MENU_DESC (1.0.5): after the names (TUNE: the unit) each item's tab, index and name (DISPLAY CONTROL AUDIO MIDI SYSTEM)", ok);
     {   /* an older editor reads the names and stops: the tab is past them, nothing it reads moved */
         uint32_t m = menu_desc(4, &it), p = 14, q;
@@ -956,8 +959,8 @@ static int menu_protocol(void)
         menu_desc(i, &it);
         ok &= strcmp(it.name, "CALIBRATION") && strcmp(it.name, "ABOUT") && strcmp(it.name, "INFO");
     }
-    n = menu_desc(33, &it);
-    ok &= n == 2u && it.index == 33 && it.id == 127;
+    n = menu_desc(37, &it);
+    ok &= n == 2u && it.index == 37 && it.id == 127;
     n = menu_desc(127, &it);
     bad += check("MENU_DESC: no CALIBRATION / INFO / ABOUT; an index past the list answers index, 127 (no item)",
                  ok && n == 2u && it.index == 127 && it.id == 127);
@@ -1031,11 +1034,16 @@ static int menu_protocol(void)
     bad += check("MENU_SET: out-of-range values clamped, the reply says the value the device took (TUNE -50..50)", ok);
 
     /* an id nobody has */
+    ok = menu_set(33, 1) == 3 && (kv_config & 1u);
+    ok &= menu_set(34, 99) == 3 && ((kv_config >> 1) & 3u) == 2u;
+    ok &= menu_set(35, 1) == 3 && ((kv_config >> 3) & 3u) == 1u;
+    ok &= menu_set(36, 1) == 3 && !(kv_config & 32u);
+    bad += check("MENU_SET velocity controls: applies all four settings and clamps curve", ok);
     {
         static uint8_t fav0[sizeof favorites], set0[sizeof settings];
         uint8_t hold0 = settings_hold, leds0 = settings_leds;
         memcpy(fav0, &favorites, sizeof favorites); memcpy(set0, &settings, sizeof settings);
-        ok = menu_set(33, 1) == 1 && host_wire[6] == 33 && ed_rv(host_wire + 7) == 1;
+        ok = menu_set(37, 1) == 1 && host_wire[6] == 37 && ed_rv(host_wire + 7) == 1;
         ok &= menu_set(126, -3) == 1 && host_wire[6] == 126 && ed_rv(host_wire + 7) == -3;
         ok &= menu_set(127, 0) == 1 && host_wire[6] == 127;
         ok &= !memcmp(fav0, &favorites, sizeof favorites) && !memcmp(set0, &settings, sizeof settings) &&
@@ -1172,7 +1180,7 @@ static int learn_protocol(void)
         bad += check("LEARN_SET op 0: learns (DRUM's TONE on CC74); CC20 again replaces its parameter", ok);
     }
     {
-        const uint8_t bad1[] = {0, 64, 0, 1}, bad2[] = {0, 21, 4, 1}, bad3[] = {0, 21, 0, P_COUNT}, bad4[] = {0, 120, 0, 1};
+        const uint8_t bad1[] = {0, 64, 0, 1}, bad2[] = {0, 21, 4, 1}, bad3[] = {0, 21, 0, P_RING}, bad4[] = {0, 120, 0, 1};
         ok = request(ED_LEARN_SET, bad1, 4) && host_wire[5] == 1u;
         ok &= request(ED_LEARN_SET, bad2, 4) && host_wire[5] == 1u;
         ok &= request(ED_LEARN_SET, bad3, 4) && host_wire[5] == 1u;
@@ -1184,7 +1192,7 @@ static int learn_protocol(void)
             request(ED_LEARN_SET, f, 4);
         }
         { const uint8_t f[] = {0, 90, 2, 40}; ok &= request(ED_LEARN_SET, f, 4) && host_wire[5] == 5u; }
-        bad += check("LEARN_SET refuses CC64 / CC120, track 4, a parameter past P_COUNT (rc 1); a 17th: rc 5 (full)", ok);
+        bad += check("LEARN_SET refuses CC64 / CC120, track 4, unlearnable RING (rc 1); a 17th: rc 5 (full)", ok);
     }
     {
         const uint8_t one[] = {1, 74}, all[] = {2}, odd[] = {3};

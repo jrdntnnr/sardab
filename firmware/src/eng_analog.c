@@ -62,7 +62,7 @@ static __attribute__((noinline)) void analog_render_x(track_t *t, voice_t *v, in
     const int16_t *p = t->p;
     uint32_t sub = p[P_E0] == AW_SUB, i;
     int32_t det = p[P_E1], mix = p[P_E2], noise = p[P_E3];
-    int32_t cut = (p[P_E4] << 8) + m->cutoff + ((v->pitch16 - 60 * 16) << 2);
+    int32_t cut = (p[P_E4] << 8) + m->cutoff + ((v->pitch16 - 60 * 16) * 4);
     tsvf_t flt;
     int32_t drive = 32768 + p[P_E6] * 512;
     int32_t m2 = mix * 258, m1 = 32767 - m2;
@@ -107,7 +107,7 @@ static __attribute__((noinline)) void analog_render_x(track_t *t, voice_t *v, in
             s += mulq15((int32_t)(noise32(&nst) >> 17) - 16384, nz);
         if (drv)
             s = softclip(((s >> 2) * (drive >> 2)) >> 11);
-        s = soft_knee(analog_tap(&flt, fk, s >> 1, &ic1, &ic2, ft), 16000) << 1;
+        s = soft_knee(analog_tap(&flt, fk, s >> 1, &ic1, &ic2, ft), 16000) * 2;
         out[i] += voice_amp(s, m, i) * 2;
     }
     v->ph[0] = ph0;
@@ -126,12 +126,12 @@ static inline __attribute__((always_inline)) void analog_osc(track_t *t, voice_t
     const int16_t *p = t->p;
     uint32_t wave = (uint32_t)p[P_E0], i;
     int32_t det = p[P_E1], mix = p[P_E2], noise = p[P_E3];
-    int32_t cut = (p[P_E4] << 8) + m->cutoff + ((v->pitch16 - 60 * 16) << 2);
+    int32_t cut = (p[P_E4] << 8) + m->cutoff + ((v->pitch16 - 60 * 16) * 4);
     tsvf_t flt;
     int32_t drive = 32768 + p[P_E6] * 512;                       /* 1x .. 3x */
     uint32_t inc1 = m->inc;
     uint32_t inc2 = det || p[P_E7] ? cents_inc(m->pitch16 + p[P_E7] * 16, det, m->tuning_fine) : inc1;   /* DTN cents, INT semitones */
-    uint32_t pw = 0x80000000u + (uint32_t)((m->shape - (64 << 8)) << 15);
+    uint32_t pw = 0x80000000u + ((uint32_t)(m->shape - (64 << 8)) << 15);
     int32_t m2 = mix * 258, m1 = 32767 - m2;                    /* osc mix Q15 */
     int32_t nz = noise * 200, drv = p[P_E6];
     uint32_t ph0 = v->ph[0], ph1 = v->ph[1];                  /* state in locals: out[] may alias v->s[] */

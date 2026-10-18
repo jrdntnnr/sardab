@@ -263,7 +263,7 @@ static void test_grain(void)
     uint32_t z0, z12, p, found = 0;
     int ok;
     jcheck("GRAIN: G_DPIT PITCH -12..12 and G_DSPRY SPRAY 0..127 after KEYS', G_COUNT 39",
-          G_DPIT == G_KOCT + 1u && G_DSPRY == G_DPIT + 1u && G_COUNT == 39u && str_eq(GP[G_DPIT].label, "PITCH") &&
+          G_DPIT == G_KOCT + 1u && G_DSPRY == G_DPIT + 1u && G_COUNT == 43u && str_eq(GP[G_DPIT].label, "PITCH") &&
           GP[G_DPIT].min == -12 && GP[G_DPIT].max == 12 && str_eq(GP[G_DSPRY].label, "SPRAY") && GP[G_DSPRY].max == 127);
     for (p = 0; p < NPAGES; p++) {
         if (str_eq(PAGES[p].title, "DLY 2") && PAGES[p].fam == FAM_FX && PAGES[p].scope == SC_GLOBAL &&

@@ -37,6 +37,7 @@ static const uint8_t ED_MENU[][2] = {
     {MI_SCRWAKE, 30},                                  /* 1.5.5: SCREEN WAKE +MIDI / PANEL, a setting, MIDI */
     {MI_SCENE, 31},                                    /* GHOULBOX: SCENE, SYSTEM */
     {MI_NAMES, 32},                                    /* GHOULBOX 2.1: NOTE NAMES, SYSTEM */
+    {MI_VMODE, 33}, {MI_VCURVE, 34}, {MI_VTOUCH, 35}, {MI_VTOP, 36},
 };
 #define ED_MENU_N NELEM(ED_MENU)
 

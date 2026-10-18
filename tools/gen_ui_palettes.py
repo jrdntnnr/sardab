@@ -51,8 +51,9 @@ PALETTES = [
     ("NIGHT",  (0, 0, 0),       (0, 24, 10),     (150, 230, 170), (56, 220, 100),  (255, 255, 255)),
     # 1.0.2: black and white (the derived tokens are set, not blended: bw()); the old MONO is GREY (id 0)
     ("MONO",   (0, 0, 0),       (0, 0, 0),       (255, 255, 255), (255, 255, 255), (255, 255, 255)),
-    # SARDAB (docs/SARDAB_UI_SPEC.md 4.1): obsidian, deep stone, bone, sandstone values, copper for the active thing
-    ("SARDAB", (16, 21, 17),    (38, 43, 37),    (234, 223, 201), (223, 181, 135), (220, 145, 108)),
+    # SARDAB: AmbientZero-inspired black / blue / red. Brighter functional blue for legible values.
+    # Keep ID 11: the existing default theme follows its approved new colours.
+    ("SARDAB", (0, 0, 0),      (10, 10, 30),    (221, 221, 238), (135, 152, 255), (255, 86, 72)),
 ]
 BW = "MONO"
 BW_GREY = (82, 82, 82)             # MONO's one mid grey (RGB565 10/20/10): DIM LINE RAISE LANE

@@ -84,6 +84,25 @@ const keyLit = (a.ex.web_lit_keys() >> 7) & 1;
 a.ex.web_keys(0);
 a.render(400);
 check(`a key sounds (peak ${a.peak.toFixed(3)}) and lights its LED`, a.peak > 0.01 && keyLit === 1);
+{ // Browser-only affordance: locally generated chord tones join the firmware's physical-key LED.
+  const c = await device(null);
+  c.render(1000);
+  c.turn(EN.ALGO, 1);                                   // T2: the power-on scene's polyphonic ANALOG track
+  c.tap(B.SCL); c.render(500); c.tap(B.SCL);            // SCL, let its quick layer settle, then CHORD
+  c.turn(EN.K1, 1);                                     // CHRD DIA3
+  c.ex.web_keys(1 << 7);                                // C4 -> C E G with the default chromatic/C-major scale
+  c.render(200);
+  const triad = c.ex.web_lit_keys();
+  c.ex.web_keys(0); c.render(200);
+  const released = c.ex.web_lit_keys();
+  c.turn(EN.K1, 1);                                     // CHRD DIA7
+  c.ex.web_keys(1 << 7); c.render(200);                  // C4 -> C E G B
+  const seventh = c.ex.web_lit_keys();
+  c.ex.web_keys(0); c.render(200);
+  const cMajor = 1 << 7 | 1 << 11 | 1 << 14, cMajor7 = cMajor | 1 << 18;
+  check(`web chord LEDs: DIA3 ${triad.toString(16)}, DIA7 ${seventh.toString(16)} light every visible tone and release clears them`,
+        (triad & cMajor) === cMajor && !(released & cMajor7) && (seventh & cMajor7) === cMajor7);
+}
 a.render(1500);
 a.peak = 0;
 a.ex.web_midi(0x90, 64, 100);                                  // Web MIDI: E4 on channel 1
@@ -180,6 +199,17 @@ check("a fresh instance with the kept sectors has it; one without does not",
           ms.some((v, i) => v !== us[i]) && ms.every((v, i) => v === ts[i]));
   }
 }
+
+// ---- portable state: the live project is captured even apart from the autosave sectors, and validated by firmware
+const livePtr = a.ex.web_project_capture(), liveSize = a.ex.web_project_size();
+const live = new Uint8Array(a.mem.buffer, livePtr, liveSize).slice();
+const inPtr = a.ex.web_project_import_buffer(), inCap = a.ex.web_project_import_capacity();
+new Uint8Array(a.mem.buffer, inPtr, live.length).set(live);
+const liveValid = a.ex.web_project_validate(live.length);
+const corrupt = live.slice(); corrupt[corrupt.length - 1] ^= 1;
+new Uint8Array(a.mem.buffer, inPtr, corrupt.length).set(corrupt);
+check(`portable state captures a ${liveSize}-byte live project and validates before restore`,
+      livePtr && liveSize > 0 && liveSize <= inCap && liveValid === 1 && a.ex.web_project_validate(corrupt.length) === 0);
 
 // ---- deterministic: the same gestures, the same samples
 async function song() {

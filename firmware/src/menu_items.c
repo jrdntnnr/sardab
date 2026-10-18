@@ -16,7 +16,7 @@
 enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_HOME, MI_HOLD, MI_ACCEL, MI_LATCH, MI_BPMLOCK, MI_SCLLED,
        MI_PREVIEW, MI_CHADD, MI_SELECT, MI_LOWCUT, MI_USB,
        MI_CLICK, MI_CLKLVL, MI_COUNTIN, MI_TUNE, MI_MIDIIN, MI_TCH1, MI_TCH2, MI_TCH3, MI_TCH4, MI_MFOLLOW, MI_SCRWAKE, MI_LCLEAR, MI_SCENE, MI_NAMES, MI_SERIAL, MI_RESTORE, MI_PANEL, MI_INFO,
-       MI_ABOUT, MI_COUNT };
+       MI_ABOUT, MI_VMODE, MI_VCURVE, MI_VTOUCH, MI_VTOP, MI_COUNT };
                                                        /* (1.1: the metronome's rows in AUDIO; 1.2: RESTORE LAST in
                                                         * SYSTEM, SCALE LEDS STEP PREVIEW CHORD ENTRY in CONTROL, SCOPE in
                                                         * DISPLAY, TUNE in AUDIO, MIDI IN in MIDI, INFO in SYSTEM;
@@ -24,7 +24,7 @@ enum { MI_COLOR, MI_STYLE, MI_LARGE, MI_ANIM, MI_LEDS, MI_SCROFF, MI_SCOPE, MI_H
                                                         * in CONTROL, T1..T4 CHANNEL, AUTO SELECT and SCREEN WAKE
                                                         * in MIDI) */
 #define MI_VALUES MI_PANEL
-static int menu_valued(uint32_t row) { return row < MI_VALUES && row != MI_LCLEAR; }   /* (a row with a value) */
+static int menu_valued(uint32_t row) { return (row < MI_VALUES && row != MI_LCLEAR) || (row >= MI_VMODE && row <= MI_VTOP); }   /* (a row with a value) */
 #define MI_PROJECT(row) ((row) == MI_TUNE || ((row) >= MI_MIDIIN && (row) <= MI_TCH4))   /* the project's values (song.g,
                                                                                          * song.mch), not settings */
 #define MI_TCH(row) ((row) >= MI_TCH1 && (row) <= MI_TCH4)   /* 1.5.5 (#202): T1..T4 CHANNEL, MIDI IN TRACK's */
@@ -33,16 +33,16 @@ static const char *const MI_NAME[MI_COUNT] = {"COLOR", "STYLE", "LARGE", "ANIM",
                                               "SPEAKER EQ", "USB LEVEL", "CLICK", "CLICK LEVEL", "COUNT-IN", "TUNE",
                                               "MIDI IN", "T1 CHANNEL", "T2 CHANNEL", "T3 CHANNEL", "T4 CHANNEL",
                                               "AUTO SELECT", "SCREEN WAKE", "LEARN CLEAR", "SCENE", "NOTE NAMES", "USB SERIAL", "RESTORE LAST", "CALIBRATION", "INFO",
-                                              "ABOUT"};
+                                              "ABOUT", "VELOCITY", "CURVE", "TOUCH", "TOP KEYS"};
 /* 1.0.5: the MENU's tabs (ui_menu.c: ALGORITHM steps between them, PRESETS among one tab's rows; the editor gets a
  * row's tab after its MENU_DESC reply). A tab's rows follow each other in MI order (tests/ui_test.c checks it); at
  * most MTAB_ROWS each (the page does not scroll: ui_menu.c fits them; 1.2: 7, the rows of such a tab 21 px; 1.3: 8,
  * 18 px). A new row
  * joins a tab here. Tabs are in the order the device shows them; a tab's index is what the editor is told, not an id
  * (1.2: MIDI came in before SYSTEM, SYSTEM's index 3 -> 4) */
-enum { MTAB_DISPLAY, MTAB_CONTROL, MTAB_AUDIO, MTAB_MIDI, MTAB_SYSTEM, MTAB_COUNT };
+enum { MTAB_DISPLAY, MTAB_CONTROL, MTAB_AUDIO, MTAB_MIDI, MTAB_SYSTEM, MTAB_TOUCH, MTAB_COUNT };
 #define MTAB_ROWS 8u
-static const char *const MTAB_NAME[MTAB_COUNT] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "SYSTEM"};
+static const char *const MTAB_NAME[MTAB_COUNT] = {"DISPLAY", "CONTROL", "AUDIO", "MIDI", "SYSTEM", "TOUCH"};
 static const uint8_t MI_TAB[MI_COUNT] = {
     MTAB_DISPLAY, MTAB_DISPLAY, MTAB_DISPLAY, MTAB_DISPLAY, MTAB_DISPLAY,   /* COLOR STYLE LARGE ANIM LEDS */
     MTAB_DISPLAY,                                                           /* SCREEN OFF (1.1.5) */
@@ -63,6 +63,7 @@ static const uint8_t MI_TAB[MI_COUNT] = {
     MTAB_SYSTEM, MTAB_SYSTEM,                                               /* SCENE, NOTE NAMES (GHOULBOX; CONTROL is full) */
     MTAB_SYSTEM, MTAB_SYSTEM,                                               /* USB SERIAL, RESTORE LAST */
     MTAB_SYSTEM, MTAB_SYSTEM, MTAB_SYSTEM,                                  /* CALIBRATION, INFO (1.2), ABOUT */
+    MTAB_TOUCH, MTAB_TOUCH, MTAB_TOUCH, MTAB_TOUCH,
 };
 /* TUNE: the project's tuning in cents (G_TUNE, -50..+50); as a row its values 0..TUNE_N - 1 (value - TUNE_MIN). The
  * editor gets it as a number (EDM_INT: the cents, min..max, its unit) */
@@ -165,6 +166,7 @@ static const char *const SELECT_N[SEL_N] = {"BPM", "PAGE", "MODW", "VEL"};
 /* a row's value as 0..menu_n(row) - 1 in the order the menu steps it (LEDS: OFF DIM LO DIM HI INV INV LO INV HI) */
 static uint32_t menu_n(uint32_t row)
 {
+    if (row == MI_VCURVE || row == MI_VTOUCH) return 3u;
     return row == MI_COLOR ? NPALETTES : row == MI_LOWCUT || (row >= MI_CLICK && row <= MI_COUNTIN) ? 3u :
            row == MI_HOLD ? 4u : row == MI_LEDS ? LEDS_ROWS : row == MI_SCROFF ? NELEM(SCROFF_N) :
            row == MI_SCENE ? GB_NSCENE : row == MI_TUNE ? TUNE_N : row == MI_MIDIIN ? NELEM(N_ROUTE) : MI_TCH(row) ? MCH_N : row == MI_ANIM ? 3u : row == MI_HOME ? HV_COUNT :
@@ -174,6 +176,7 @@ static uint32_t menu_get(uint32_t row)
 {
     const menu_flag_t *f = menu_flag(row);
     uint32_t i = 0;
+    if (row >= MI_VMODE && row <= MI_VTOP) return kv_setting(favorites.factory[15], row - MI_VMODE);
     if (f)
         return ((ui_prefs | (uint32_t)ui_rec_prefs << 8 | (uint32_t)ui_prefs2 << 16) & f->bit) != 0;
     switch (row) {
@@ -202,6 +205,11 @@ static const char *menu_vname(uint32_t row, uint32_t v)
     const menu_flag_t *f = menu_flag(row);
     if (f)
         return f->name[v & 1u];
+    if (row >= MI_VMODE && row <= MI_VTOP) {
+        static const char *const names[4][3] = {{"FIXED", "SENSE", ""}, {"LINEAR", "SOFT", "HARD"},
+            {"NORMAL", "LIGHT", "FIRM"}, {"PROBE", "FIXED", ""}};
+        return names[row - MI_VMODE][v % menu_n(row)];
+    }
     switch (row) {
     case MI_COLOR: return UI_PALETTES[v % NPALETTES].name;
     case MI_STYLE: return STYLE_N[v & 1u];
@@ -241,6 +249,18 @@ static const char *menu_vname(uint32_t row, uint32_t v)
  * kept with the project (PROJECT SAVE, the autosave), not by settings_save */
 static void menu_put(uint32_t row, uint32_t v)
 {
+    /* Some settings live outside draw_menu's cached signature (TOUCH and LED
+     * inversion). Invalidate the open menu whenever its value changes, also
+     * when changed through the editor, so the display cannot retain the old value. */
+    if (ui.menu && menu_get(row) != v)
+        ui.force = 1;
+    if (row >= MI_VMODE && row <= MI_VTOP) {
+        uint8_t *p = favorites.factory[15];
+        if (p[5] != 0x56u) { p[6] = p[7] = p[8] = p[9] = 0; p[5] = 0x56u; }
+        p[6 + row - MI_VMODE] = (uint8_t)(v % menu_n(row));
+        kv_config = kv_settings(p); /* one atomic configuration word for both ISRs */
+        return;
+    }
     const menu_flag_t *f = menu_flag(row);
     if (f) {
         if (f->bit & PREF_X)

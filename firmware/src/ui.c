@@ -168,12 +168,11 @@ static struct {
     uint8_t hot_col, hot_t;      /* column whose knob was just turned (drawn white) */
     uint8_t menu;                /* 0 off, 1 list, 2 about + credits, 3 info (1.2) (HOME held) */
     uint8_t menu_sel;            /* MENU: the row (menu_items.c MI_*; its tab MI_TAB), kept while the device runs */
-    uint8_t menu_row[5];         /* MENU: the row last picked in each tab, from its first (ALGORITHM comes back to it) */
+    uint8_t menu_row[6];         /* MENU: the row last picked in each tab, from its first (ALGORITHM comes back to it) */
     uint16_t menu_scroll;        /* continuous ABOUT + CREDITS position, pixels */
     uint32_t menu_sig, home_t0;  /* HOME press time (btn_hold) */
     uint8_t force;               /* full redraw pending */
     uint8_t msg_t;               /* transient message frames */
-    uint8_t torches, torch_f;    /* GHOULBOX: the stage shows torches; their flame frame */
     uint8_t bpm_t;               /* frames the BPM stays highlighted after a SELECT turn */
     uint8_t act;                 /* action pages: the column whose action OCT+ does, + 1; 0 = none (act_col) */
     uint8_t tl_clean;            /* SAVE > TOOLS: KNOB 2 turned on past INIT, CLEAN INIT picked (1.5.5, #190) */
@@ -223,7 +222,7 @@ static struct {
 } ui;
 
 enum { CF_NONE, CF_CLEAR_SEQ, CF_CLEAR_TRK, CF_OVR_PROJ, CF_OVR_USER, CF_LOAD_PAT,
-       CF_DEL_ROW, CF_CLEAR_SONG, CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER, CF_ERASE_PROJ, CF_CLEAN_SOUND };
+       CF_DEL_ROW, CF_CLEAR_SONG, CF_INIT_SOUND, CF_CLEAR_MOTION, CF_ERASE_USER, CF_ERASE_PROJ, CF_CLEAN_SOUND, CF_DREAM };
                                   /* ui.confirm: TOOLS' clears; SAVE over a used slot; a pattern over the user's steps;
                                    * USER ERASE; PROJECT ERASE (1.5.5, #199); CLEAN INIT (1.5.5, #190) */
 
@@ -427,6 +426,8 @@ static int page_visible(uint32_t i)
         return ENGINES[TSEL->eng_req % NENGINES] == &ENG_ANALOG;
     if (PAGES[i].graph >= GR_FMOP && PAGES[i].graph <= GR_FMENV)
         return TSEL->eng_req % NENGINES == ENGI_FM6;
+    if (PAGES[i].scope == SC_TRACK && PAGES[i].id[0] == P_RING)   /* GHOULBOX 2.3: RING, a GURDY track's */
+        return TSEL->eng_req % NENGINES == ENGI_GURDY;
 #if FELUCCA_SLICE
     if (PAGES[i].graph == GR_SLICES)
         return ENGINES[TSEL->eng_req % NENGINES] == &ENG_SLICE;
@@ -529,6 +530,8 @@ static void page_entered(void)
     ui.act = pg->graph == GR_USER ? 4u : 0u;     /* the save screen is ready for OCT+ */
     ui.tl_clean = 0;
     ui.force = 1;
+    if (!ui.home && pg->scope == SC_GLOBAL && pg->id[0] == G_DREAM)
+        ui_message("A KEY: DREAM IN IT");        /* GHOULBOX 2.3: DREAM's keys */
 }
 
 static int step_on(const step_t *st) { return st->time == ST_NOTE && (st->n || st->hit); }
@@ -591,6 +594,11 @@ static int detail_on(void)
 /* GLO > SONG (1.2): the white keys A B C D (A3 B3 C4 D4, white places 2..5: seq.c song_key) set the selected cell's slot;
  * they do not sound there, the other keys play as anywhere (seq.c keyboard_block: song.grid 3) */
 static int song_keys_on(void) { return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->graph == GR_SONG; }
+/* GHOULBOX 2.3: HOME > DREAM, its keys compose (dream.c dream_keys) */
+static int dream_keys_on(void)
+{
+    return !ui.home && !ui.menu && !ui.confirm && !ui.layer && cur_page()->scope == SC_GLOBAL && cur_page()->id[0] == G_DREAM;
+}
 
 /* black key place p (seq.c key_place) held, 0 = not */
 static int black_held(uint32_t p)
@@ -996,10 +1004,12 @@ static void load_begin(track_t *t, uint32_t what)
     load_motion_hold(t, what);
 }
 
+static void dream_forget(void);                   /* (dream.c, below) */
 static void load_end(track_t *t)
 {
     if (--undo_depth)
         return;
+    dream_forget();                               /* GHOULBOX 2.3.1: DREAM's parts follow the sounds now there */
     if (load_mo & 1u) {                           /* a sound load: the motion on the common parameters stays */
         (void)motion_sound_loaded(t, load_from, t->eng_req);
         if ((load_mo & 2u) && motion_count(t))
@@ -1397,6 +1407,7 @@ static void apply_preset_to(track_t *t, uint32_t pi)
     t->p[P_REL] = e->presets[pi].env[3];
     t->p[P_ED_FLT] = e->presets[pi].fenv;
     t->p[P_VOICE] = e->presets[pi].mono ? V_LEGATO : V_POLY;   /* mono presets keep the legato feel */
+    t->p[P_RING] = (int16_t)(e == &ENG_GURDY && ((GURDY_RING >> pi) & 1u));   /* GHOULBOX 2.3: the drone presets ring */
     {   /* the sends */
         static const uint8_t FX_DEF[4] = {0, 24, 28, 36};
         const preset_t *pr = &e->presets[pi];
@@ -1844,6 +1855,7 @@ static void track_select(uint32_t i)
 #include "ui_slice.c"                             /* EDIT > SLICES: SLICE's slices by hand (an action page too) */
 #include "ui_events.c"                            /* SEQ > AUTOMATION: locks, events, CHANCE, RATCH as a list (an action page) */
 #include "midi_learn.c"                           /* MIDI LEARN (1.5): GLO + D4, a knob, a CC */
+#include "dream.c"                                 /* GHOULBOX 2.3: HOME > DREAM, generative ambient */
 
 /* ---------------------------------------------------- action pages --- */
 /* Pages whose purpose is an action (SAVE > USER, PHRASES, PROJECT, TOOLS, EDIT > SLICES, SEQ > AUTOMATION): the knobs pick,

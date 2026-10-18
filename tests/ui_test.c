@@ -167,6 +167,7 @@ static int check(const char *what, int ok)
 /* main.c felucca_init */
 static void ui_power_on(void)
 {
+    memset(&dream, 0, sizeof dream);
     uint32_t i;
     memset(trk, 0, sizeof trk);
     memset(&song, 0, sizeof song);
@@ -181,6 +182,9 @@ static void ui_power_on(void)
     proj_name[0] = 0;
     proj_cur = PROJ_NO_SLOT;
     memset(&favorites, 0, sizeof favorites);
+    kv_config = kv_seen = 0; kv_hw_on = 0;
+    memset(kv_played, 0, sizeof kv_played); memset(kv_velocity, 0, sizeof kv_velocity);
+    memset(kv_capture, 0, sizeof kv_capture);
     ml_off();                                     /* (MIDI LEARN off, nothing learned) */
     favorites.factory[15][13] = GB_MIG_SERIAL;
     memset(&undo, 0, sizeof undo);
@@ -402,7 +406,7 @@ static int gm_hits_play(track_t *t)
 }
 
 /* sounds never touch the steps; the arp, the scale, the SLICER and the pattern parameters are the track's */
-static void go_title(const char *title);              /* (below; GHOULBOX's torch check uses it) */
+static void go_title(const char *title);              /* (below) */
 static int test_sound_loads(void)
 {
     int bad = 0;
@@ -607,53 +611,11 @@ static int test_sound_loads(void)
             blade += swap16(cv_px[(2u + 8u) * 240u + i]) == T_TEXT;   /* the blade's row */
         bad += check("a selected list row: the sword, accent text, no THEME bar", theme < 40u && accent > 40u && blade >= 6u);
     }
-    {   /* GHOULBOX: torches on HOME's stage; their flame moves; a list page has none */
-        static uint16_t f0[12 * 30], f2[12 * 30];
-        uint32_t i, diff = 0, ink = 0;
-        cv_begin(12, 30, T_SURF);
-        torch_draw(0, 0, 0);
-        memcpy(f0, cv_px, sizeof f0);
-        cv_begin(12, 30, T_SURF);
-        torch_draw(0, 0, 2);
-        memcpy(f2, cv_px, sizeof f2);
-        for (i = 0; i < 12u * 30u; i++) {
-            diff += f0[i] != f2[i];
-            ink += swap16(f0[i]) == T_ACCENT;
-        }
-        ui_power_on();
-        ui.force = 1; ui_draw();
-        bad += check("torches: the flame flickers (frames differ), it burns (accent), HOME shows them",
-                     diff > 4u && ink > 10u && ui.torches == 1u && PANEL_X0 >= 24);
-        go_title("PRESETS");
-        ui.force = 1; ui_draw();
-        bad += check("  a list page: no torches, the full width", ui.torches == 0u && PANEL_X0 == 10);
-    }
-    {   /* GHOULBOX: on every page with torches, each torch tile holds the torch on stone and nothing else (the
-         * flicker repaints only the tile: a curve through it would be cut) */
-        static const char *const PG[4] = {"", "ENV", "LFO", "FX"};
-        uint32_t k, x, y, n = 0, pages = 0;
-        track_t keep = *TSEL;
-        for (k = 0; k < 4u; k++) {
-            ui_power_on();
-            TSEL->p[P_ATK] = 0;                          /* (the steepest attack, the shortest release: the */
-            TSEL->p[P_REL] = 0;                          /* ENV curve's ends nearest the torches) */
-            TSEL->p[P_SUS] = 127;
-            if (k) go_title(PG[k]);
-            ui.force = 1; ui_draw();
-            if (!ui.torches) continue;
-            pages++;
-            for (uint32_t side = 0; side < 2u; side++) {
-                int32_t tx = side ? TORCH_RX : TORCH_LX;
-                cv_begin(12, 30, T_SURF);
-                cv_stone(0, 0, 12, 30, tx, TORCH_Y);
-                torch_draw(0, 0, side ? ui.torch_f ^ 2u : ui.torch_f);
-                for (y = 0; y < 30u; y++)
-                    for (x = 0; x < 12u; x++)
-                        n += host_screen[(Y_GRAPH + TORCH_Y + y) * 240u + (uint32_t)tx + x] != cv_px[y * 12u + x];
-            }
-        }
-        *TSEL = keep;
-        bad += check("torch tiles: only the torch on stone on HOME, ENV, LFO, FX (no graph drawn into them)", pages == 4u && n == 0u);
+    {   /* Full-width stages in every palette; no decorative animation tiles. */
+        ui_power_on(); ui.force = 1; ui_draw();
+        bad += check("HOME: full-width graph without torches", PANEL_X0 == 10 && PANEL_W == 220);
+        go_title("PRESETS"); ui.force = 1; ui_draw();
+        bad += check("PRESETS: full-width graph", PANEL_X0 == 10 && PANEL_W == 220);
     }
     {   /* GHOULBOX: inside a stone window nothing is drawn in INK (it was text on the old THEME bar): the PRESETS
          * row's suggested pattern, the EDIT layer's favourite star */
@@ -1758,9 +1720,9 @@ static int test_menu_tabs(void)
             }
     }
     ui_prefs = 0;
-    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI SYSTEM (8 8 6 8 7 rows; 1.5.5: SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE; GHOULBOX: no HELP), 1..8 each in a run, fit the page; tab gaps "
+    bad += check("MENU tabs: DISPLAY CONTROL AUDIO MIDI SYSTEM TOUCH (8 8 6 8 7 4 rows; 1.5.5: SELECT, T1..T4 CHANNEL, AUTO SELECT, SCREEN WAKE; GHOULBOX: no HELP), 1..8 each in a run, fit the page; tab gaps "
                  "constant (S, LARGE)",
-                 ok && MTAB_COUNT == 5u && str_eq(MTAB_NAME[0], "DISPLAY") && str_eq(MTAB_NAME[MTAB_MIDI], "MIDI") &&
+                 ok && MTAB_COUNT == 6u && mtab_rows(MTAB_TOUCH) == 4u && str_eq(MTAB_NAME[0], "DISPLAY") && str_eq(MTAB_NAME[MTAB_MIDI], "MIDI") &&
                  mtab_rows(MTAB_DISPLAY) == 8u && MI_TAB[MI_HOME] == MTAB_DISPLAY && mtab_rows(MTAB_CONTROL) == 8u && MI_TAB[MI_SELECT] == MTAB_CONTROL && mtab_rows(MTAB_AUDIO) == 6u &&
                  mtab_rows(MTAB_MIDI) == 8u && MI_TAB[MI_MFOLLOW] == MTAB_MIDI && MI_TAB[MI_SCRWAKE] == MTAB_MIDI && MI_SCRWAKE + 1u == MI_LCLEAR && MI_TAB[MI_LCLEAR] == MTAB_MIDI && MI_TAB[MI_TCH4] == MTAB_MIDI && mtab_rows(MTAB_SYSTEM) == 7u && MI_TAB[MI_TUNE] == MTAB_AUDIO &&   /* (1.5: LEARN CLEAR; GHOULBOX: no HELP) */
                  MI_TAB[MI_MIDIIN] == MTAB_MIDI && MI_TAB[MI_INFO] == MTAB_SYSTEM && MI_INFO >= MI_VALUES);
@@ -1785,7 +1747,7 @@ static int test_menu_tabs(void)
     turn(EN_ALGO, -1); turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LOWCUT;
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LATCH;   /* (back at the row left there) */
     turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_LEDS;
-    turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_SCENE && menu_tab() == MTAB_SYSTEM;   /* (wraps; 1.3: SCENE its first row) */
+    turn(EN_ALGO, -1); ok &= ui.menu_sel == MI_VMODE && menu_tab() == MTAB_TOUCH;   /* wraps to the new tab */
     turn(EN_ALGO, 1); ok &= ui.menu_sel == MI_LEDS;
     bad += check("MENU: ALGORITHM steps between the tabs and wraps, each tab back at its last row", ok && ui.menu == 1);
     turn(EN_ALGO, 1); turn(EN_PRESET, -1);            /* CONTROL: from FX LATCH up to KNOB ACCEL */
@@ -2154,9 +2116,7 @@ static uint32_t roll_diff(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int in
     for (y = 0; y < 240; y++)
         for (x = 0; x < 240; x++) {
             int inside = x >= x0 && x < x1 && y >= y0 && y < y1;
-            int torch = y >= Y_GRAPH + TORCH_Y && y < Y_GRAPH + TORCH_Y + 30 &&     /* (GHOULBOX: the torches flicker */
-                        ((x >= TORCH_LX && x < TORCH_LX + 12) || (x >= TORCH_RX && x < TORCH_RX + 12));   /* on their own) */
-            if (!torch && inside == in && host_screen[y * 240 + x] != roll_shot[y * 240 + x]) n++;
+            if (inside == in && host_screen[y * 240 + x] != roll_shot[y * 240 + x]) n++;
         }
     return n;
 }
@@ -2783,7 +2743,7 @@ static int test_page_cycles(void)
         ok &= f != FAM_SEQ || PAGES[i].graph == GR_ROLL || PAGES[i].graph == GR_EVENTS;
         ok &= f != FAM_GLO || PAGES[i].graph == GR_SONG;   /* (1.2: GLO's only page) */
         ok &= f != FAM_TRK || PAGES[i].graph == GR_TRK || str_eq(PAGES[i].title, "CLOCK") ||
-              str_eq(PAGES[i].title, "KEYS");                 /* HOME's: MIXER CLOCK KEYS (2.1) */
+              (str_eq(PAGES[i].title, "KEYS") || str_eq(PAGES[i].title, "DREAM"));                 /* HOME's: MIXER CLOCK KEYS (2.1) */
         ok &= PAGES[i].graph != GR_TRK || f == FAM_TRK;
         ui_power_on(); ui.home = 0; ui.page = (uint8_t)i; page_entered();
         ok &= FAM_BTN[cur_fam()] == (f == FAM_TRK ? B_HOME : f == FAM_GLO ? B_GLO : f == FAM_SEQ ? B_SEQ :
@@ -2963,6 +2923,8 @@ static int test_product_ux(void)
     press(B_HOME);                                      /* (2.1: CLOCK > KEYS > HOME) */
     ok &= !ui.home && str_eq(cur_page()->title, "KEYS");
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
+    press(B_HOME);
     ok &= ui.home && !ui.menu;
     press(B_HOME);
     ok &= cur_page()->graph == GR_TRK;
@@ -2979,8 +2941,10 @@ static int test_product_ux(void)
         memcpy(song.g, g0, sizeof g0);
     }
     press(B_HOME);
+    ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
+    press(B_HOME);
     ok &= ui.home;
-    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT); elsewhere HOME", ok);
+    bad += check("HOME cycles HOME > MIXER > CLOCK > KEYS > DREAM > HOME (CLOCK: BPM SWG CLK; KEYS: MODE TRK SPLT OCT); elsewhere HOME", ok);
     hold(B_HOME);
     bad += check("1.2: HOME held still opens the menu", ui.menu == 1);
     ui_power_on();
@@ -9532,6 +9496,7 @@ static int test_home_tracks(void)
     press(B_HOME); ok = !ui.home && cur_page()->graph == GR_TRK;
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "CLOCK");
     press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "KEYS");
+    press(B_HOME); ok &= !ui.home && str_eq(cur_page()->title, "DREAM");
     press(B_HOME); ok &= ui.home;
     frame();
     ok &= tr_px(3 + 22, tr_y(3) + 1) == T_THEME;

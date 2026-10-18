@@ -14,7 +14,7 @@ import os
 import re
 import sys
 
-FUNCS = ["analog_render", "digital_render", "digital_render_legacy", "digital_render_custom", "phase_render", "phase_render_f", "lofi_render", "sample_render", "formant_render",
+FUNCS = ['keyboard_block', 'kv_keys', 'fm1_kv_finish', 'fm1_kv_contacts', 'fm1_kv_start', 'fm1_kv_drive'] + ["analog_render", "digital_render", "digital_render_legacy", "digital_render_custom", "phase_render", "phase_render_f", "lofi_render", "sample_render", "formant_render",
          "trio_render", "trio_pass", "wheel_render", "wheel_block",
          "grain_render", "grain_block", "phys_render", "drum_render", "noise_render", "fm6_render", "fm6_op_run", "fm6_op_fb", "px_modal_block", "px_modal_run", "px_memb_block",
          "px_string_excite", "px_string_run", "px_symp_run",
@@ -33,7 +33,7 @@ FUNCS = ["analog_render", "digital_render", "digital_render_legacy", "digital_re
          "perf_flanger", "perf_phaser",                     # .. FLANGER, PHASER (1.2), while held or fading
          "perf_throw",                                      # .. REV / ECHO THROW (1.5.1): per part, while held or gliding
          "rev_room", "rev_spring", "rev_hall", "rev_side_mix",   # the reverb bus (fx.c): REVERB TYPE ROOM / SPRING / HALL (and its stereo)
-         "track_insert", "ins_drive", "ins_swept",          # the per-track INSERT (fx.c, 1.5), while a TYPE plays
+         "track_insert", "ins_drive", "ins_swept", "ins_amp", "dly_grain", "mod_tsrc",          # the per-track INSERT (fx.c, 1.5), while a TYPE plays
          "mix_part_run", "master_block",                    # a part's mix (out of the ISR: mix_part's sound fade), the master
          "texture_mix", "cave_gen", "texture_gen"]                      # TEXTURE (fx.c), while a source plays
 # built only with FELUCCA_FM4=1 (DIGITAL, src/eng_digital.c; not in the default build, so not in BUDGET): absent,

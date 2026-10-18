@@ -64,13 +64,13 @@ typedef struct {
     up_rec_t r[UP_PER_BANK];
 } up_bank_t;
 _Static_assert(sizeof(up_rec_t) == 192, "user preset record layout");
-_Static_assert(P_COUNT <= UP_PMAX * 2u && P_COUNT < 128, "user preset record: P_COUNT");
+_Static_assert(P_COUNT <= UP_PMAX * 2u && P_COUNT <= 128, "user preset record: P_COUNT");
 static up_bank_t up_bank[UP_SLOTS / UP_PER_BANK] __attribute__((section(".pool")));   /* (main loop only) */
 
 static up_rec_t *up_rec(uint32_t k) { return &up_bank[k / UP_PER_BANK].r[k % UP_PER_BANK]; }
 
 /* 1.2 (Discussion #90): the sound's category (category.c CAT_*) in the record's last byte, packed[UP_CAT_AT]: a
- * version 4 / 5 record's values take np = P_COUNT (< 128) of its 144 bytes and nothing reads the others (up_valid
+ * version 4 / 5 record's values take np = P_COUNT (<= 128) of its 144 bytes and nothing reads the others (up_valid
  * neither), so every record of before holds 0 there (CAT_NONE: listed by its engine, cat_of_engine) and firmware
  * before keeps the byte (a bank is written whole) without reading it: no format change, no version bump. A record of
  * versions 1..3 (a 16-bit value in every pair) has none; giving it one (a rename) rewrites it as version 4 / 5 when its
@@ -112,7 +112,7 @@ static int up_valid(const up_rec_t *r)
 {
     if (!(r->used == UP_USED && r->ver >= 1u && r->ver <= UP_VER_GRID && r->engine < NENGINES &&
           r->np >= 8u && r->np <= (r->ver >= 4u ? UP_PMAX * 2u : UP_PMAX) && r->name[0])) return 0;
-    if (r->np > P_COUNT || (r->ver <= 5u && r->np > 112u) ||
+    if (r->np > P_COUNT || (r->ver <= 5u && r->np > 113u) ||
         ((r->ver == 6u || r->ver == 7u) && r->np != 103u)) return 0;
     if (r->ver >= 4u) for (uint32_t i = 0; i < r->np; i++) if (r->packed[i] > 191u) return 0;
     return 1;
@@ -170,7 +170,7 @@ static void up_params(const up_rec_t *r, int16_t *out, const int16_t *def)
     int16_t values[UP_PMAX * 2u];
     for (uint32_t i = 0; i < r->np && i < NELEM(values); i++) values[i] = up_value(r, i);
     if (r->ver == 6u || r->ver == 7u) params_gbm1(out, values, def);
-    else if ((r->ver == 4u || r->ver == 5u) && r->np == 112u) params_ghoul2(out, values, def);
+    else if ((r->ver == 4u || r->ver == 5u) && (r->np == 112u || r->np == 113u)) params_ghoul2(out, values, r->np, def);
     else params_by_count(out, values, r->np, def);
     if (r->engine == ENGI_ANALOG && !(r->ver >= 4u && r->np <= UP_CAT_AT && (r->packed[UP_CAT_AT] & UP_INT_MARK))) {
         out[P_E7] = 0;                                  /* (a record before INT: KTR there) */

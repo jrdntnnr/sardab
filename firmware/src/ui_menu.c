@@ -73,15 +73,15 @@ static void menu_head(void)
  *                   CLOSE is in the header: the four would not fit in S (cv_key_row drops words, from the last)
  * Drawn in two bands (the canvas holds 124 rows) split in a gap between two rows; while the tabs slide only their
  * strip (24..58) is drawn again */
-static const uint16_t MTAB_ICON[MTAB_COUNT] = {ICON_X_EYE, ICON_X_KNOB, ICON_X_SPEAKER, ICON_MIDI, ICON_X_COG};
+static const uint16_t MTAB_ICON[MTAB_COUNT] = {ICON_X_EYE, ICON_X_KNOB, ICON_X_SPEAKER, ICON_MIDI, ICON_X_COG, ICON_X_KNOB};
 #define MT_Y 29                                        /* the tab bar */
 #define MT_H 24
-#define MT_IW 26                                       /* a cushion with its icon alone (the icon centred in it; 1.2, five
+#define MT_IW 22                                       /* a cushion with its icon alone (the icon centred in it; 1.2, five
                                                         * tabs: 26, up to 1.1.5 32) */
-#define MT_NX 24                                       /* the name's pen in the one shown; 10 px after it */
+#define MT_NX 20                                       /* the name's pen in the one shown; 10 px after it */
 #define MT_X0 6
 #define MT_X1 234
-#define MT_GAP 5                                       /* between two tabs, always (the bar centred in MT_X0..MT_X1; 1.2, five
+#define MT_GAP 3                                       /* between two tabs, always (the bar centred in MT_X0..MT_X1; 1.2, five
                                                         * tabs: 5, up to 1.1.5 8) */
 #define MT_ONE 64                                      /* mt.pos per tab */
 #define MP_Y 59                                        /* the rows' panel */
@@ -202,7 +202,7 @@ static void menu_row(uint32_t k, uint32_t row)
         cv_text_r(MR_VR, vy, &AF_M, b, val, bg);
         return;
     }
-    if (row >= MI_VALUES) {                            /* CALIBRATION, ABOUT: OCT+ opens them */
+    if (!menu_valued(row)) {                            /* CALIBRATION, ABOUT: OCT+ opens them */
         GFX_HOOK_ALIGN(0, y, 0, y + h, AL_V, "menu row chevron centred up/down");
         cv_icon_in(MR_VR - 12, y, 0, h, 12, ICON_X_RIGHT, sel ? T_ACCENT : T_MID, bg);
         return;

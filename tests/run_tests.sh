@@ -316,6 +316,18 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "stock V15 supply startup (Melodee 1.3.6): the trace, every timeout, read-back faults" "$OUT/power_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/desert2_test" tests/desert2_test.c -lm
     run "GHOULBOX desert 2: CANON, ARP DRONE, the delay's tape motor, P_CANON in projects, the header's CPU bar, page turns" "$OUT/desert2_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/upstream_test" tests/upstream_test.c -lm
+    run "upstream DSP: grain pitch, COMB, NOISE, AMP and project compatibility" "$OUT/upstream_test"
+    for name in ring_test dream_test dream_maqam_test; do
+        $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/$name" "tests/$name.c" -lm
+        run "Ghoulbox 2.3: $name" "$OUT/$name"
+    done
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/menu_value_test" tests/menu_value_test.c -lm
+    run "HOME menu: knobs change and redraw every setting; TOUCH persists" "$OUT/menu_value_test"
+    $CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/velocity_test" tests/velocity_test.c -lm
+    run "contact velocity: curves, fallback, chords, layers, MIDI, recording and settings" "$OUT/velocity_test"
+    $CC -O2 -w -o "$OUT/velocity_hal_test" tests/velocity_hal_test.c
+    run "velocity ADC scheduling, weak drive, top probe and pin restoration" "$OUT/velocity_hal_test"
     $CC -O1 -w -Ibuild/gen -Ifirmware/src -o "$OUT/keys_test" tests/keys_test.c -lm
     run "HOME > KEYS (GHOULBOX 2.1): LAYER, SPLIT, OCT, release as started, the SEQ pages, saved with the project" "$OUT/keys_test"
     $CC -O1 -w -DFELUCCA_FM4=1 -Ibuild/gen -Ifirmware/src -o "$OUT/digital_test" tests/digital_test.c -lm
@@ -340,6 +352,8 @@ if [ -f build/gen/felucca_tables.h ]; then
     run "settings: PER1..PER4 migration, palette ids and preference preservation" "$OUT/settings_test"
     $CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/ui_test" tests/ui_test.c -lm
     run "UI: sounds keep steps, undo, recording, MIDI overflow, pending saves, panel recovery, drum grid, song chain, GREY gray, MONO neutral" "$OUT/ui_test"
+    $CC -O1 -w -Ibuild/gen -Ifirmware/src -Itests -o "$OUT/desert_ui_test" tests/desert_ui_test.c -lm
+    run "DESERT UI: effective tuning, live notes, sample upload refresh, loaded state and legacy theme" "$OUT/desert_ui_test"
     $CC -DPREEMPT -g -fwrapv -fsanitize=address,undefined -fno-sanitize=shift -fno-sanitize-recover=all -w \
         -Ibuild/gen -Ifirmware/src -o "$OUT/drumfuzz" tests/drumfuzz_test.c -lm
     run "DRUM grid stress (#211, ASan / UBSan): random grid editing, locks, undo, engines over a playing synth, the ISR anywhere" \
@@ -508,6 +522,12 @@ run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/inst
 
 if command -v node >/dev/null 2>&1; then
     run "web pages: editor protocol + samples, package builder, update protocol" node web/test_web.mjs
+    run "upstream sample loops and stock restore" node web/test_upstream.mjs
+    run "emulator page DOM startup and event wiring" node web/emu/page_test.mjs
+    run "emulator portable backups and MIDI tools" node web/emu/io_test.mjs
+    run "emulator WAV capture" node web/emu/audio_export_test.mjs
+    run "emulator FLAC and MP3 codecs" node web/emu/audio_encode_test.mjs
+    run "emulator mobile audio recovery" node web/emu/audio_session_test.mjs
     run "web backup: capture, validation before writes, restore order" node web/test_backup.mjs
     run "Scala import: ratios, cents, octave maps, invalid files" node web/test_scala.mjs
     run "desert bank preparation and sample integrity" node web/test_desert.mjs
@@ -525,6 +545,7 @@ else
     run "browser emulator: the same song from the native build" "$OUT/emu_native" "$OUT/emu_native.f32"
     run "browser emulator: boot, keys, MIDI, screen, LEDs, PLAY, a save kept across instances, = native, cost" \
         node web/emu/emu_test.mjs build/emu/felucca.wasm "$OUT/emu_native.f32"
+    run "emulator sample import, persistence and sustain loops" node web/emu/sample_test.mjs
 fi
 
 [ $fail -eq 0 ] && echo "ALL HOST TESTS PASSED" || { echo "HOST TESTS FAILED"; exit 1; }

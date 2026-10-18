@@ -157,8 +157,8 @@ For the package built with SLICE omitted, run the static target check with `FELU
 
 ## SARDAB 2.1 graphics and target profile
 
-The standard build regenerates the Huffman-compressed boot artwork and keycap
-masks. Both generators verify exact decoded pixels. Keep all generated headers
+The current build draws the SARDAB boot identity and keycap pills in code;
+`gen_ghoulbox_art.py` was removed in the latest integration. Keep generated headers
 from the same build profile: the device build omits SLICE to fit flash, whereas
 full host/emulator tests may generate assets with SLICE enabled. Run a fresh
 target build after such tests before distributing firmware. The target-budget

@@ -96,6 +96,7 @@ extern void isr_timer5(void);
 
 static void timer5_start(void)                 /* OSC /4 = 6 MHz, PRD 600 -> 10 kHz */
 {
+    fm1_adc_owned = 1;  /* From here only the scan starts conversions; the UI reads caches. */
     fm1_timer5_start(isr_timer5, 4);   /* above ALNK0 (3): the scan nests into the render (see fm1_timer5_irq) */
 }
 
@@ -139,6 +140,7 @@ static void fm1_fault(const fm1_crash_t *c)
 /* power-on: GHOULBOX's scene, the one MENU > SYSTEM > SCENE picks (ui.c gb_scene_load; settings_init ran before) */
 static void felucca_init(void)
 {
+    kv_config = kv_settings(favorites.factory[15]);
     chain_defaults(&chain_config);
     fm6_init();                               /* every track's FM6 patch: the init voice */
     gb_scene_load(ui_scene);

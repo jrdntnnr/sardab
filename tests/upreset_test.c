@@ -265,7 +265,7 @@ int main(void)
     r.engine = 2;   /* (not ANALOG: its E7 is INT since the desert, 0 for records without the mark) */
     for (i = 0; i < P_COUNT; i++)
         def[i] = (int16_t)(1000 + i);
-    r.np = P_COUNT - 2u;
+    r.np = 125u; /* no TEMP, CANON or RING */
     for (i = 0; i < P_COUNT; i++)
         up_set_value(&r, i, (int16_t)i);
     up_params(&r, v, def);
@@ -284,7 +284,7 @@ int main(void)
     up_params(&r, v, def);
     ok = P_SLCR == 45 && P_SLDEPTH + 1 == P_M1SRC && P_M4AMT + 1 == P_FM1_ATK && P_FM4_LEVEL + 1 == P_CHRD &&
          P_VOIC + 1 == P_LN0 && P_LN7 + 1 == P_LSYNC && P_SQNT + 1 == P_SPRD && P_SPRD + 1 == P_ITYPE &&
-         P_IMIX + 1 == P_FTYPE && P_ESYNC + 1 == P_TC0 && P_TMASK1 + 1 == P_TEMP && P_TEMP + 1 == P_E0 && P_E0 == 118 && P_COUNT == 127;
+         P_IMIX + 1 == P_FTYPE && P_ESYNC + 1 == P_TC0 && P_TMASK1 + 1 == P_TEMP && P_TEMP + 1 == P_E0 && P_E0 == 118 && P_COUNT == 128;
     for (i = 0; i < 45u; i++)
         ok &= v[i] == (int16_t)(2000 + i);
     for (i = P_SLCR; i < P_E0; i++)

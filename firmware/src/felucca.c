@@ -35,7 +35,7 @@
 #define FELUCCA_ID "FM-1_900"    /* package identity (build.py: the .fwsc marker string) */
 #endif
 #ifndef FELUCCA_VERSION
-#define FELUCCA_VERSION "SARDAB 2.1" /* shown in the menu, the console and the editor; build.py --release X.Y */
+#define FELUCCA_VERSION "SARDAB 2.3" /* shown in the menu, the console and the editor; build.py --release X.Y */
 #endif
 #if FELUCCA_OTA && !FELUCCA_FLASH
 #error "FELUCCA_OTA needs FELUCCA_FLASH"
@@ -51,6 +51,7 @@
 #if FELUCCA_DUAL_CORE
 #include "fm1_multicore.h"
 #endif
+#define FM1_KEY_VELOCITY 1
 #include "fm1_input.h"
 #include "fm1_timer.h"
 #include "fm1_audio.h"

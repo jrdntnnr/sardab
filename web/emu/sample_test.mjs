@@ -2,6 +2,7 @@
 // Real Wasm sample import: validation, occupied-slot protection, sound and persistence.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 import {storeSectors, restoreSectors} from './worklet.js';
 
 const wasm = fs.readFileSync(process.argv[2] || 'build/emu/felucca.wasm');
@@ -63,3 +64,28 @@ assert.deepEqual(restarted.nor.subarray(offset, offset + bank.length), bank);
 stage(restarted.e);
 assert.equal(restarted.e.web_sample_install(1, bank.length, 0), 2);
 console.log(`emu samples: Tar renders (peak ${peak.toFixed(3)}), invalid imports rejected, occupied slots protected, bank survives restart`);
+
+// Encode an editor loop and play it through the actual SAMPLE engine, with all sends off.
+const editor = fs.readFileSync('web/editor.html', 'utf8');
+const proto = editor.slice(editor.indexOf('/*PROTO-BEGIN*/'), editor.indexOf('/*PROTO-END*/'));
+const {buildSlot} = vm.runInNewContext(proto + ';({buildSlot})', {console,setTimeout,clearTimeout,setInterval,clearInterval});
+async function loopPeak(looped) {
+  const {e} = await boot();
+  const sound = Int16Array.from({length:2205}, (_,i)=>Math.round(Math.sin(i * 2 * Math.PI / 100) * 27000));
+  const slot = buildSlot('LOOP', [{s:sound,root:60,looped,ls:500,le:1499}]);
+  const bytes = new Uint8Array(512 + slot.data.length).fill(255);
+  bytes.set(slot.hdr); bytes.set(slot.data,512); stage(e,bytes);
+  assert.equal(e.web_sample_install(0,bytes.length,0),0);
+  for (const cc of [86,91,92,93,94]) e.web_midi(0xb0,cc,0);
+  render(e,4410);
+  e.web_buttons(1<<4); render(e,2646); e.web_buttons(0); render(e,22050); // EDIT / SET
+  e.web_enc(6,1); render(e,4410); // KNOB 4: LOOP on
+  e.web_keys(1<<7); render(e,44100*3);
+  const peak = render(e,4410);
+  e.web_keys(0); render(e,44100*3);
+  assert(render(e,4410)<.001,'release must stop the loop');
+  return peak;
+}
+const looping = await loopPeak(true), oneShot = await loopPeak(false);
+assert(looping>.01 && oneShot<.001, `loop flag must sustain beyond source duration: ${looping} / ${oneShot}`);
+console.log(`emu samples: editor loop sustains (${looping.toFixed(3)}), one-shot ends (${oneShot.toFixed(6)}), release stops playback`);

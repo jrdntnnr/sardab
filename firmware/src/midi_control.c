@@ -252,7 +252,7 @@ static void midi_cc_set(track_t *t, uint32_t id, uint32_t value)
  * (midi_learn.c) writes the entries with the interrupts off; ml_arm / ml_heard hand a CC heard while learning to it */
 #define ML_N 16u
 #define ML_E0 120u
-typedef char ml_ids_fit[P_E0 < ML_E0 && P_COUNT - P_E0 == 9 ? 1 : -1];   /* (P_CANON, after P_E7: no code, never learned) */
+typedef char ml_ids_fit[P_E0 < ML_E0 && P_COUNT - P_E0 == 10 ? 1 : -1];   /* (P_CANON, after P_E7: no code, never learned) */
 static uint8_t *const ml_tab;               /* favorites.factory[14] (midi_learn.c: a build without the UI, none) */
 static volatile uint8_t *const ml_io;       /* ui.ml.io (midi_learn.c; not globals here: the ISR's data keeps its layout) */
 #define ml_arm (ml_io[0])                   /* the UI waits for a CC (MIDI LEARN with a parameter picked) */
