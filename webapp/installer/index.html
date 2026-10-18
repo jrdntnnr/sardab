@@ -33,7 +33,7 @@
   <button class="lang" id="lang"></button>
   <h1>GHOULBOX <span class="small" style="color:var(--dim)">on Felucca</span></h1>
   <p><strong>SARDAB 2.3 development preview</strong> — Ghoulbox 2.3 parity features, Arabic tuning and desert instruments.
-    New blue/red Bayer theme. This build still needs physical FM-1 validation. Existing screen-layout audit findings remain unresolved.
+    Blue/red Bayer theme and Persian سرداب splash. This build still needs physical FM-1 validation. Existing screen-layout audit findings remain unresolved.
     <a href="https://github.com/jrdntnnr/sardab/blob/main/docs/INTEGRATION-STATUS.md" style="color:inherit">Validation and compatibility</a>.</p>
   <p><strong>Dungeons of the Desert:</strong> open PRESETS → LIST → DESERT for nine built-in sounds and USR1 / USR2 / USR3.
     Optional oud, qanun, ney and Persian Tar banks are available in the editor.
@@ -859,7 +859,7 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "sardab-2.3-bayer-ui-preview", "product": "FM-1_900", "pkg": "../../firmware/felucca-sardab-2.3-bayer-ui-preview.fwsc"};
+const meta = {"version": "sardab-2.3-persian-splash-preview", "product": "FM-1_900", "pkg": "../../firmware/felucca-sardab-2.3-persian-splash-preview.fwsc"};
 
 let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };

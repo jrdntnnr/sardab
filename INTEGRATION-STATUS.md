@@ -1,6 +1,25 @@
 # SARDAB build status — 2026-10-18
 
-## Latest local rebuild: Bayer UI preview
+## Latest rebuild: Persian splash
+
+**sardab-2.3-persian-splash-preview** replaces the splash name with **سرداب**
+and unifies hardware/emulator/README splash rendering. The README now shows
+current screenshots, including DESERT presets. [Details](PERSIAN-SPLASH.md).
+
+- Splash pixel checks pass in all 12 palettes; focused DESERT UI checks pass.
+- Chrome WASM boot pixels match the native screenshot exactly; desktop/phone
+  appearance inspected. Emulator audio matches **88,200 native stereo frames**.
+- Device build, loader/update checks and target budgets pass. No audio changes.
+- Application **576,240 / 581,564 bytes**, **5,324 free**. Static RAM **59,172**,
+  SDRAM pool **349,504**. Hardware validation pending.
+- Package **610,276 bytes**, `FM-1_900`, SHA-256
+  `ea418898dd0779b5debd348ce04b5f7e86d273ab9e6e79ef7a3b5252ac1ae16e`.
+- Source on `main`; public emulator/installer: `https://jrdntnnr.github.io/sardab/`.
+  Evidence: `build/assessment/farsi-splash/`. Full layout audit inherited from
+  the previous Bayer build below; only splash checks were rerun for this change.
+
+
+## Previous rebuild: Bayer UI preview
 
 **sardab-2.3-bayer-ui-preview** adds the AmbientZero blue/red default palette,
 shared static Bayer patterns, torch removal, responsive emulator and Focus
