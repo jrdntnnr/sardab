@@ -1,11 +1,15 @@
 # Flashing the current FM-1 development build
 
-Built on 2026-10-13 as **SARDAB 2.1**, combining Ghoulbox 2.1 features with
-our Felucca/SLOOP base, maqam tuning and desert instruments. The target build,
-audio references, migrations, functional UI, emulator and update-loader
-simulations pass. Physical-device validation is pending; the UI layout audit
-and a pre-existing PHASER host-cost estimate remain unresolved.
-[Full validation status](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/INTEGRATION-STATUS.md).
+Rebuilt on 2026-10-18 as **SARDAB 2.3**, with the [blue/red Bayer theme](BAYER-UI.md), [DESERT UI improvements](DESERT-UI.md), Ghoulbox 2.3.2 DREAM/RING,
+maqam-aware generation, the smaller FM6 table, audio DMA acknowledgement and
+stock-restore corrections. Existing DESERT instruments, tuning, velocity,
+inserts and 48 kHz USB audio remain. BLE is excluded.
+[New controls and compatibility](GHOULBOX-2.3-PARITY.md) ·
+[Velocity controls](VELOCITY.md) · [Build evidence](INTEGRATION-STATUS.md).
+
+This is a device build with host/emulator validation, awaiting physical tests
+of these latest changes. Use the bundled editor: its INFO parameter-count
+handling changed. Keep a complete backup from before updating if you may downgrade.
 
 ## Install from this computer
 
@@ -19,9 +23,9 @@ and a pre-existing PHASER host-cost estimate remain unresolved.
    running mode; the installer requests update mode itself.
 3. In **Chrome or Edge**, open
    <http://127.0.0.1:8792/webapp/installer/>. This local page contains
-   **sardab-2.1-preview**. The same preview is available from the
-   [public installer](https://jrdntnnr.github.io/ghoulbox-fm1-dungeon-synth/webapp/installer/).
-   Check that its label says **sardab-2.1-preview** before installing.
+   **sardab-2.3-bayer-ui-preview**. Check that exact label before installing.
+   The [public installer](https://jrdntnnr.github.io/sardab/webapp/installer/)
+   also serves this build; check the same exact label there.
 4. Click **Install** and allow **MIDI / SysEx** access when prompted.
 5. Keep USB connected and the computer awake through **Verifying**, **Writing**
    and **Restarting**. Wait for **Done** and the FM-1 to boot before closing
@@ -31,6 +35,11 @@ No separate programmer is needed for a normally running FM-1.
 
 ## First checks on the device
 
+Velocity remains FIXED initially. To test sensing, hold HOME to open the menu,
+release HOME, then turn ALGORITHM
+to TOUCH, select VELOCITY with PRESETS and set SENSE with a numbered knob.
+Press HOME to save. See the [velocity guide](VELOCITY.md) for response settings.
+
 Start with a low volume. Open **PRESETS**, turn **knob 4 (LIST)** to
 **DESERT**, then browse with the **PRESETS knob**. Try **SANTUR**, **MIJWIZ**
 and **ARGHUL**. For a simple tuning check, select **ROOT C**,
@@ -38,9 +47,15 @@ and **ARGHUL**. For a simple tuning check, select **ROOT C**,
 Try **DIA3** for a microtonal triad. Save a small test project and verify that
 it returns after restarting.
 
+This build enables the second CPU core. MENU → ABOUT reports the active core
+count. To try the same firmware with one core, hold **REC while powering on**;
+that setting lasts for the session. Host tests cover the split-render logic,
+not actual hardware concurrency or rail voltages.
+
 The Tar bank is optional and is not automatically written into a sample slot
 by flashing firmware. Use the editor's Samples controls to prepare/upload Tar.
-The DESERT entries USR1/2/3 play the banks in those slots; an empty slot is silent.
+The DESERT entries USR1/2/3 play the banks in those slots; an empty or invalid
+slot shows MISSING and uses the existing sine fallback.
 
 ## If the installer cannot connect
 
@@ -63,13 +78,17 @@ python3 -m http.server 8792 --bind 127.0.0.1 --directory build/device-install
 
 ## Package identity
 
-- File: `build/device-install/firmware/felucca-sardab-2.1-preview.fwsc`
-- Size: 610,086 bytes; updater identity `FM-1_900`
-- SHA-256: `2ab4bd41b416f432b0068c2ffc8117da0c023508ba19825403a9f7b94c082e76`
-- Application: 579,304 bytes; 2,260 bytes free
-- Static RAM: 56,068 / 73,728 bytes; SDRAM pool: 333,172 / 368,640 bytes
+- File: `build/device-install/firmware/felucca-sardab-2.3-ghoulbox-parity-preview.fwsc`
+- Size: 610,276 bytes; updater identity `FM-1_900`
+- SHA-256: `18f6c558870dc092f1e8fa87c9223400a33ea7ddd301e10992ba303d25f734a7`
+- Application: 571,096 bytes; 10,468 bytes free
+- Static RAM: 59,076 / 73,728 bytes; SDRAM pool: 349,504 / 368,640 bytes
+
+The installer folder includes BUILDINFO.json and SOURCE.patch, recording the
+base commit and local source changes used for this preview.
 
 The updater identity is shared with earlier development builds. The display
 version is SARDAB 2.1; use the package hash to identify this exact build. This target
 profile omits the retired SLICE engine; old SLICE tracks will not play.
-Validation logs are under `build/assessment/ghoulbox-2/`.
+Validation logs for this fix are under `build/assessment/menu-fix/`; preceding
+upstream checks are under `build/assessment/upstream-port/`.

@@ -1,15 +1,210 @@
-# SARDAB 2.1 development preview — 2026-10-13
+# SARDAB build status — 2026-10-18
+
+## Latest local rebuild: Bayer UI preview
+
+**sardab-2.3-bayer-ui-preview** adds the AmbientZero blue/red default palette,
+shared static Bayer patterns, torch removal, responsive emulator and Focus
+Screen fix. [Screens, controls and validation](BAYER-UI.md).
+
+- UI/partial redraw tests, web protocol and emulator DOM checks, package
+  update/loader checks and target budgets pass. All **158 audio references
+  unchanged**; WASM matches **88,200 native stereo frames** exactly.
+- **238 scenes × 12 palettes**, same **244 layout / 912 alignment findings**.
+  Chrome playback and desktop/phone visual checks pass; hardware checks pending.
+- Application **575,616 / 581,564 bytes**, **5,948 free**. Static RAM **59,172**;
+  SDRAM pool **349,504**. Application shrinks by **392 bytes**.
+- Package **610,276 bytes**, `FM-1_900`, SHA-256
+  `af0689c599957855934e8b986af3b35357437f6b07f2417c3d1cbe7715500b6a`.
+- Local installer: `http://127.0.0.1:8792/webapp/installer/`.
+  ZIP: `build/sardab-2.3-bayer-ui-preview.zip`. Logs: `build/assessment/bayer-ui/`.
+  Source: `jrdntnnr/sardab`, branch `main`. Public emulator and installer:
+  `https://jrdntnnr.github.io/sardab/`.
+
+## Previous local rebuild: DESERT UI preview
+
+**sardab-2.3-desert-ui-preview** adds the approved tuning display, DESERT preset
+feedback and SARDAB theme cleanup to the parity build below.
+[Screens, controls and checks](DESERT-UI.md).
+
+- Six focused native suites, update/loader checks and target budgets pass.
+  All **158 audio reference renders are unchanged** from the parity build.
+  Rebuilt WASM matches **88,200 native stereo frames** exactly.
+- App **576,008 / 581,564 bytes**, **5,556 free**; static RAM **59,172**,
+  SDRAM pool **349,504**, both unchanged. Code grows **1,872 bytes**.
+- UI audit: **238 scenes × 12 palettes** plus styles/parameter sweeps, with
+  the same **244 layout / 912 alignment findings** as before this change.
+  No new findings on the new scenes; physical display validation pending.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `c52c4642c0bb85788f6e5fda5b68e595fc69475817d1df8829c2a4ba988cdbb7`.
+- Local installer: `http://127.0.0.1:8792/webapp/installer/`.
+  ZIP: `build/sardab-2.3-desert-ui-preview.zip`.
+  Evidence: `build/assessment/desert-ui/`. Not pushed publicly.
+
+## Previous local rebuild: Ghoulbox 2.3.2 parity preview
+
+**sardab-2.3-ghoulbox-parity-preview**, displayed as SARDAB 2.3 / GB2.3.2-dune.
+[Features, controls and compatibility](GHOULBOX-2.3-PARITY.md): DREAM with a
+MAQAM mood, RING drones, FM6 table compression, audio DMA acknowledgement,
+project-import and rolling-label fixes, complete official stock-restore path.
+No BLE or DX7-import changes. Existing instruments, velocity and 48 kHz USB
+audio are retained. Hardware SLICE remains disabled.
+
+- **33 native suites pass**, plus web editor/update/backup suites, a DOM page
+  check, and real official V15 hash/whole-image validation. Project migration
+  tests also pass AddressSanitizer/UndefinedBehaviorSanitizer.
+- DREAM checks **600 scale/tonic combinations × 10 evolution passes**, custom
+  masks/cent trims, simultaneous Rast oscillator pitches and save/reload.
+- **158 audio references** pass: 143 unchanged, 15 reviewed FM6/mix updates for
+  the quadratic lookup. Maximum measured mantissa error **0.00000425 cents**.
+- The rebuilt WASM emulator matches **88,200 native stereo frames exactly**.
+  This is not a physical-device or live-browser validation of the new build.
+- Application **574,136 / 581,564 bytes**; **7,428 bytes free**. Static RAM
+  **59,172 / 73,728**; pool **349,504 / 368,640**. Target instruction budgets pass;
+  `.ram_text` has 916 instructions/no calls and `.c1_text` 40/no direct calls.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `bbf32e99568bba17f77d6906680e773e902239b02b3456f701bc13658155aacb`.
+- Logs: `build/assessment/ghoulbox-2.3.2/`. Local installer:
+  `http://127.0.0.1:8792/webapp/installer/`. ZIP:
+  `build/sardab-2.3-ghoulbox-parity-preview.zip`.
+  These changes have not been pushed or deployed to the public installer.
+
+
+## Previous local rebuild: HOME menu refresh fix
+
+The menu accepted knob changes to TOUCH and some LED settings but retained their
+old displayed values. `menu_put` now invalidates the open menu on a value change,
+including editor-originated changes. This addresses a confirmed display bug;
+it does not establish that every reported hardware input problem has this cause.
+Release HOME after the menu opens before turning the knobs.
+
+- New regression checks every editable row with all four knobs, at both text
+  sizes, comparing the resulting screen with a forced redraw. SENSE enable,
+  OCT controls and settings reload also pass. The test failed before the fix.
+- Six focused native suites pass: menu values, full UI, velocity, editor, update
+  and loader. Existing target budgets pass. The rebuilt emulator matches 88,200
+  native frames exactly. No physical device or live browser validation.
+- Application **571,096 / 581,564 bytes**, leaving **10,468 bytes**. Static RAM
+  **59,076 / 73,728**; pool **349,504 / 368,640**. ISR instruction counts unchanged.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `18f6c558870dc092f1e8fa87c9223400a33ea7ddd301e10992ba303d25f734a7`.
+  Local installer label: **sardab-2.1-menu-fix-preview**. Display: SARDAB 2.1.
+  Logs: `build/assessment/menu-fix/`. Public deployment remains unchanged.
+
+## Previous local rebuild: upstream integration preview
+
+Built from `ccf64f3` plus local velocity and upstream changes. Full feature/use
+notes: [October ports](UPSTREAM-PORTS-2026-10.md). The newly published vendor SDK
+is assessed in [M-VAVE SDK](MVAVE-SDK-ASSESSMENT.md).
+
+- Added AMP INSERT, smooth NOISE modulation, grain-boundary pitch updates,
+  bounded COMB and engine arithmetic fixes, and staggered LED mid-level pulses.
+- Editor: sustain loops/WAV markers, zero-crossing snapping, sample gain and
+  level matching. Emulator: portable backups, MIDI panel controls, chord LEDs,
+  mobile audio recovery, focus mode, WAV/FLAC/MP3 recording and phone sizing.
+- Stock restore recognizes SARDAB and uses our app-only loader with the pinned
+  official V15 image. Tested with the actual V15 supplied in M-VAVE's SDK:
+  restored flash is byte-identical to V15; our loader is retained.
+- Application **571,064 / 581,564 bytes**, leaving **10,500 bytes**. Static RAM
+  **59,076 / 73,728**; pool **349,504 / 368,640**. RAM interrupt code: 916
+  instructions, no calls; core-1 code: 40 instructions, no direct calls.
+- **26 native suites pass**, including update/loader simulations. The 158 audio
+  references stay unchanged. New DSP cases pass address/undefined-behavior
+  sanitizers. Existing target budgets pass without increased limits; separate
+  entries monitor the new AMP/grain routines.
+- Editor, sample/restore, codec and audio recovery tests pass. The emulator
+  matches **88,200 native frames exactly**; Tar import/restart and editor-created
+  sample-loop sustain/release pass. Page startup is checked with a DOM model;
+  live browser automation was unavailable in this session. No claim of browser
+  visual or physical hardware validation is made.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `119640b16b9368758e8d06ac679d9014c765e1c4c6547d480c8468d936d764b9`.
+  Local installer label: **sardab-2.1-upstream-preview**. Display: SARDAB 2.1.
+  Logs: `build/assessment/upstream-port/`. Public deployment is unchanged.
+- DX7 import changes excluded. WHEEL/DRIFT storage changes, USB/BLE integration,
+  large sequencer/storage rewrites and physical validation remain separate work.
+
+## Previous local rebuild: contact velocity preview
+
+Built from `ccf64f3` plus the local source changes recorded in the install
+folder's `SOURCE.patch`. [Controls](VELOCITY.md) · [Flashing](FLASHING.md).
+
+- Opt-in SENSE, three curves, three touch sensitivities and a top-key probe/fixed
+  choice. Existing settings start FIXED. One nonblocking scheduler owns key,
+  MASTER and battery ADC conversions and restores GPIO before digital scanning.
+- Velocity reaches maqam chords, layered tracks, live MIDI output and recording.
+  The arp now retains input velocity through ordering/octaves and every mode,
+  including CHORD and DRONE. Playback retains the recorded value; each sequencer
+  step still has one shared velocity, taking the strongest recorded attack.
+- Application **570,156 / 581,564 bytes**, leaving **11,408 bytes**. Static RAM
+  **59,060 / 73,728**; SDRAM pool **349,504 / 368,640**. RAM interrupt section:
+  916 instructions, no calls; core-1 section: 40 instructions, no direct calls.
+- All checked target budgets pass. Existing ALNK/TIMER5 limits are unchanged;
+  separately monitored velocity/keyboard helpers have new baseline entries.
+  These are static instruction checks, not measured hardware interrupt times.
+- **23 focused native suites pass**, including the new sensing/HAL suites,
+  motion/arp behavior, all suites from the prior rebuild and update simulations
+  against this exact package. The 158 audio references remain unchanged.
+  Velocity and HAL tests also pass address/undefined-behavior sanitizers.
+- Editor tests pass. Emulator: 88,200 frames bit-identical to the native build;
+  Tar import/playback passes. TOUCH menu inspected at both text sizes. No full
+  UI audit or physical hardware validation was performed.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `23f5270be992a73cdefad5d62ea085ac1c94a80c5fbb64a9964ecc07ffa05b7f`.
+  Local installer label: **sardab-2.1-velocity-preview**. Display: SARDAB 2.1.
+  The public deployment remains separate. Logs: `build/assessment/velocity/`.
+
+Contact response, finger-placement effects, the upper-key probe and end-to-end
+latency require testing on the user's device. No adaptive calibration or
+pressure/aftertouch was added. Host/emulator checks cannot certify these.
+
+## Previous local rebuild: ccf64f3
+
+Rebuilt on 2026-10-15 after pulling the Felucca 1.6 / Melodee / JIANT changes.
+Firmware sources match `ccf64f3`. Local web fixes supply emulator HAL stubs
+for the new hardware-startup references and align the editor with 127 track
+parameters / 39 globals. They fix Scala eligibility, CANON descriptors, legacy
+preset imports and visibility of KEYS/grain-delay controls. These changes do
+not change the device binary.
+
+- Application **567,844 / 581,564 bytes**, leaving **13,720 bytes**.
+- Static RAM **58,436 / 73,728**; SDRAM pool **349,504 / 368,640**.
+- RAM interrupt code: 916 instructions, no calls. Core-1 code: 40 instructions,
+  no direct calls. All checked target instruction budgets pass.
+- Package **610,276 bytes**, identity `FM-1_900`, SHA-256
+  `8384cbc301b7d689f320a4aa4e146632559ee95651af8c21f763cc9db6aeb574`.
+- **19 focused host suites pass**: boot guard, supply-startup transaction logic,
+  dual-core split rendering, desert additions, old project/preset migration,
+  microtonal chord pitches and mapping, backup, MIDI, keyboard layers, functional
+  UI, sample-bank audio, editor protocol and update-entry/loader simulations.
+  Audio regression: **158 references, none changed**, no audio health, routing,
+  voice-budget or host CPU-budget failures.
+- Web editor/protocol, backup, Scala and desert asset checks pass. The emulator
+  renders 88,200 frames bit-for-bit against the native comparison build; Tar
+  import/playback checks pass. These checks use Node, not a live browser/device.
+- The build uses the current default dual-core configuration, with SLICE omitted.
+  REC held at power-on selects one core for the session. Host tests do not
+  validate hardware concurrency or supply voltages.
+- Local installer label: **sardab-2.1-ccf64f3**. The public deployment is separate.
+  [Installation instructions](FLASHING.md). Logs and build identity live in
+  `build/assessment/device-ccf64f3/`.
+
+This exact rebuilt package has not been flashed in this session. The full UI
+layout audit was not rerun; earlier findings below are historical, not a
+measurement of this revision.
+
+## Previous build evidence — 2026-10-13
+
 
 This fork integrates selected **Ghoulbox 2.1** changes (`eaf04bd`) into our
 **Felucca 1.5.1 / SLOOP** base, retaining maqam tuning, Scala import, tuned chords
-and our instruments. [Controls and migration](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/GHOULBOX-2-INTEGRATION.md).
+and our instruments. [Controls and migration](GHOULBOX-2-INTEGRATION.md).
 The source and deployments belong to
-[jrdntnnr/ghoulbox-fm1-dungeon-synth](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth).
+[jrdntnnr/sardab](https://github.com/jrdntnnr/sardab).
 
 **Status: buildable development preview, not a hardware-validated release.**
 No FM-1 has been flashed or acoustically tested in this work.
 
-## Current combined build
+### Combined build at bb65def
 
 - **DESERT** groups our nine synthesized sounds and SAMPLE **USR1/2/3**.
   Device category browsing, loading and settings restoration pass; the editor
@@ -43,7 +238,7 @@ No FM-1 has been flashed or acoustically tested in this work.
 The expanded SAMPLE preset table required updating two old fixed-count tests;
 the corrected sample and MIDI program-change checks pass independently.
 Validation logs are in `build/assessment/ghoulbox-2/`.
-[Flashing instructions and exact package](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/FLASHING.md).
+[Flashing instructions and exact package](FLASHING.md).
 
 ## Device build from b9d47b7
 
@@ -62,14 +257,14 @@ as do update-entry, loader and command-line installer simulations. No physical
 installation has been performed. The previous full UI render audit was not
 repeated and its findings remain unresolved.
 
-[Flashing instructions and exact package](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/FLASHING.md).
+[Flashing instructions and exact package](FLASHING.md).
 
 ## Earlier instrument build (d0bd9bc)
 
 The current source adds PHYS SANTUR / DUSK SANTUR and TRIO MIJWIZ / ARGHUL,
 independent compact adaptations of published Quilcom designs. They use the
 existing DSP and allocate no additional synthesis state. See
-[controls and provenance](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/SOURCED-SYNTHS.md). These additions are on the
+[controls and provenance](SOURCED-SYNTHS.md). These additions are on the
 `microtonal` source branch; the previously published preview assets do not
 include them.
 
@@ -117,7 +312,7 @@ instrument update.
   Host audio-health, voice/routing and CPU-budget checks pass.
 - Final target build and source snapshot match. Hardware checks remain pending.
 
-[Playing guide](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/DUNGEONS-OF-THE-DESERT.md) · [Sample provenance](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/../assets/desert/README.md).
+[Playing guide](DUNGEONS-OF-THE-DESERT.md) · [Sample provenance](../assets/desert/README.md).
 The previous full-suite findings below remain unless explicitly updated here;
 this update reruns affected native, web, storage and target checks.
 
@@ -135,7 +330,7 @@ this update reruns affected native, web, storage and target checks.
 - Separate settings storage for MIDI learn and GURDY favorites; explicit
   source selection when converting ambiguous old PER4 settings backups.
 
-See [MICROTONAL.md](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/MICROTONAL.md) for controls, scales and compatibility.
+See [MICROTONAL.md](MICROTONAL.md) for controls, scales and compatibility.
 GURDY retains its one-voice cap; use a polyphonic engine for full chords.
 External MIDI output remains ordinary note numbers.
 
@@ -158,7 +353,7 @@ required AC79 SDK packaging assets are SHA-256 checked by the builder.
 The target profile omits the already-hidden SLICE engine to fit the original
 application slot. Engine ID 13 stays reserved, but old SLICE tracks cannot
 play in this package. SAMPLE, GRAIN, GURDY, DRUM and the SLICER effect remain.
-Host tests retain the full SLICE implementation. [Build instructions](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/../BUILDING.md).
+Host tests retain the full SLICE implementation. [Build instructions](../BUILDING.md).
 
 ## Verified on the host
 

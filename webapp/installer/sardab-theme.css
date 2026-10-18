@@ -1,0 +1,101 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * SARDAB / AmbientZero palette. Same 4x4 Bayer order as firmware/src/gfx.c.
+ * Static 2px cells on the web; 1px cells on the 240px device. */
+:root[data-brand="sardab"] {
+  color-scheme: dark;
+  --sd-bg: #000000; --sd-surface: #0A0A1E; --sd-text: #DDDDEE;
+  --sd-value: #8798FF; --sd-active: #FF5648; --sd-blue: #3333CC;
+  --sd-texture: #191935;
+  --sd-muted: #A8A8C7; --sd-rule: #414B80; --sd-annotate: #8798FF;
+  --sd-error: #FF8E87; --sd-warning: #E8CD84; --sd-success: #98D2B0;
+  --bg: var(--sd-bg); --fg: var(--sd-text); --dim: var(--sd-muted);
+  --line: var(--sd-rule); --rule: var(--sd-rule); --theme: var(--sd-value);
+  --body: #080816; --tray: #03030D; --part: #10102D; --edge: var(--sd-rule);
+  --label: var(--sd-text); --lit: var(--sd-active); --green: #98D2B0;
+  --bone: var(--sd-text); --amber: var(--sd-value); --night: var(--sd-bg);
+  --plaque: var(--sd-surface); --ash: var(--sd-muted); --ink: var(--sd-bg);
+  --stone: var(--sd-surface); --ember: var(--sd-active); --moss: var(--sd-success);
+  --sd-ground: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%228%22%20height%3D%228%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23111133%22%2F%3E%3C%2Fsvg%3E");
+  --sd-rule-pattern: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%228%22%20height%3D%228%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%224%22%20y%3D%220%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%226%22%20y%3D%222%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%224%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%224%22%20y%3D%224%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3Crect%20x%3D%226%22%20y%3D%226%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%238798FF%22%2F%3E%3C%2Fsvg%3E");
+}
+:root[data-brand="sardab"][data-theme="light"] {
+  color-scheme: light;
+  --sd-bg: #EEEEFA; --sd-surface: #E0E0F0; --sd-text: #14142A;
+  --sd-value: #30309B; --sd-active: #A32B22; --sd-blue: #3333CC;
+  --sd-muted: #53536D; --sd-rule: #8787AC; --sd-annotate: #30309B;
+  --sd-error: #A32B22; --sd-warning: #705616; --sd-success: #22643B;
+  --sd-ground: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%228%22%20height%3D%228%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23D5D5ED%22%2F%3E%3C%2Fsvg%3E");
+}
+:root[data-brand="sardab"] body {
+  background: var(--sd-ground) 0 0 / 8px 8px var(--sd-bg);
+  color: var(--sd-text);
+}
+:root[data-brand="sardab"] a { color: var(--sd-value); }
+:root[data-brand="sardab"] a:hover { color: var(--sd-active); }
+:root[data-brand="sardab"] :focus-visible { outline: 2px solid var(--sd-active); outline-offset: 3px; }
+:root[data-brand="sardab"] button,
+:root[data-brand="sardab"] select,
+:root[data-brand="sardab"] input { accent-color: var(--sd-active); }
+:root[data-brand="sardab"] .top,
+:root[data-brand="sardab"] .group,
+:root[data-brand="sardab"] .smp,
+:root[data-brand="sardab"] .utility { background-color: var(--sd-bg); }
+:root[data-brand="sardab"] .top { border-bottom: 2px solid var(--sd-rule); }
+:root[data-brand="sardab"] .tabs button[aria-selected="true"] {
+  color: var(--sd-text); background: var(--sd-surface); box-shadow: inset 0 2px var(--sd-active);
+}
+:root[data-brand="sardab"] .grid button.on,
+:root[data-brand="sardab"] .seg button[aria-pressed="true"],
+:root[data-brand="sardab"] button.tog[aria-pressed="true"] {
+  background-color: var(--sd-active); color: var(--sd-bg); border-color: var(--sd-active);
+}
+:root[data-brand="sardab"] .utility { padding: 14px; border: 1px solid var(--sd-rule); }
+:root[data-brand="sardab"] .utility > summary { color: var(--sd-text); }
+:root[data-brand="sardab"] .utility > summary::after,
+:root[data-brand="sardab"] .tabs::after {
+  content: ""; display: block; width: 100%; height: 2px; margin-top: 8px;
+  background: var(--sd-rule-pattern) 0 0 / 8px 8px var(--sd-blue);
+}
+:root[data-brand="sardab"] .utility button,
+:root[data-brand="sardab"] .utility select,
+:root[data-brand="sardab"] .audio button,
+:root[data-brand="sardab"] .audio select {
+  color: var(--sd-text); background: var(--sd-surface); border: 1px solid var(--sd-rule);
+}
+:root[data-brand="sardab"] .audio button,
+:root[data-brand="sardab"] .audio select { min-height: 34px; padding: 4px 8px; }
+:root[data-brand="sardab"] .utility .primary,
+:root[data-brand="sardab"] .start button,
+:root[data-brand="sardab"] .audio-recovery button {
+  background: var(--sd-active); color: var(--sd-bg); border-color: var(--sd-active);
+}
+:root[data-brand="sardab"] .audio-recovery { background: var(--sd-surface); border-color: var(--sd-active); }
+:root[data-brand="sardab"] .recorder { border-color: var(--sd-rule); }
+:root[data-brand="sardab"] .recorder.recording .record { background: var(--sd-active); color: var(--sd-bg); }
+:root[data-brand="sardab"] :is(.rec-help, .rec-peak, .record-format) { color: var(--sd-muted); }
+:root[data-brand="sardab"] .rec-meter { border-color: var(--sd-rule); }
+:root[data-brand="sardab"] .face.key { fill: url(#sd-key); stroke: var(--sd-rule); }
+:root[data-brand="sardab"] .dim .face.btn { fill: var(--part); }
+:root[data-brand="sardab"] .lit .face.btn { fill: var(--sd-active); }
+:root[data-brand="sardab"] .green .face.btn { fill: var(--green); }
+:root[data-brand="sardab"] .held .face.key,
+:root[data-brand="sardab"] .lit .face.key { fill: url(#sd-key-live); stroke: var(--sd-text); }
+:root[data-brand="sardab"] .slit { fill: var(--sd-rule); }
+:root[data-brand="sardab"] .lit .slit { fill: var(--sd-text); filter: none; }
+:root[data-brand="sardab"] .lit text { fill: var(--sd-bg); }
+:root[data-brand="sardab"] .held .face { stroke: var(--sd-text); }
+:root[data-brand="sardab"] .latched .face { stroke: var(--sd-value); }
+:root[data-brand="sardab"] .panel,
+:root[data-brand="sardab"] .toc,
+:root[data-brand="sardab"] .mini,
+:root[data-brand="sardab"] .back { background: var(--sd-surface); border-color: var(--sd-rule); box-shadow: none; }
+:root[data-brand="sardab"] :is(h1,h2,h3) { color: var(--sd-text); }
+:root[data-brand="sardab"] .hero { grid-template-columns: 1fr auto; }
+:root[data-brand="sardab"] .hero .eyebrow { color: var(--sd-active); }
+:root[data-brand="sardab"] body.focus-mode { background: #000; }
+:root[data-brand="sardab"] body.installer main { background: var(--sd-bg); }
+@media (max-width: 760px) { :root[data-brand="sardab"] .hero { grid-template-columns: 1fr; } }
+@media (orientation: portrait) and (max-width: 700px) {
+  :root[data-brand="sardab"] .device { min-width: 0; }
+}
+@media print { :root[data-brand="sardab"] body { color: #111; background: #fff; } }

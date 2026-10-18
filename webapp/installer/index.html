@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
      Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments -->
-<html lang="en">
+<html lang="en" data-brand="sardab">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -26,18 +26,19 @@
   progress { width: 100%; height: 4px; margin-top: 16px; }
   pre { color: var(--dim); font-size: 12px; white-space: pre-wrap; margin-top: 16px; }
 </style>
+<link rel="stylesheet" href="sardab-theme.css">
 </head>
-<body>
+<body class="installer">
 <main>
   <button class="lang" id="lang"></button>
   <h1>GHOULBOX <span class="small" style="color:var(--dim)">on Felucca</span></h1>
-  <p><strong>SARDAB 2.1 development preview</strong> — Ghoulbox 2.1 features + Felucca 1.5.1 and SLOOP.
-    Arabic chord pitches are host-tested; physical FM-1 validation is pending. Screen-layout audit findings remain unresolved.
-    <a href="https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/INTEGRATION-STATUS.md" style="color:inherit">Validation and compatibility</a>.</p>
+  <p><strong>SARDAB 2.3 development preview</strong> — Ghoulbox 2.3 parity features, Arabic tuning and desert instruments.
+    New blue/red Bayer theme. This build still needs physical FM-1 validation. Existing screen-layout audit findings remain unresolved.
+    <a href="https://github.com/jrdntnnr/sardab/blob/main/docs/INTEGRATION-STATUS.md" style="color:inherit">Validation and compatibility</a>.</p>
   <p><strong>Dungeons of the Desert:</strong> open PRESETS → LIST → DESERT for nine built-in sounds and USR1 / USR2 / USR3.
     Optional oud, qanun, ney and Persian Tar banks are available in the editor.
     <a href="../editor/" style="color:inherit">Open the editor</a> to prepare the sample banks.
-    <a href="https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/DUNGEONS-OF-THE-DESERT.md" style="color:inherit">Playing guide</a>.</p>
+    <a href="https://github.com/jrdntnnr/sardab/blob/main/docs/DUNGEONS-OF-THE-DESERT.md" style="color:inherit">Playing guide</a>.</p>
   <p data-t="intro"></p>
   <p data-t="warn"></p>
   <p class="small" data-t="direct"></p>
@@ -62,7 +63,7 @@
     Fonts: VT323 (Peter Hull) and Pirata One (Rodrigo Fuenzalida, Nicolas Massi), SIL OFL 1.1. Samples: Versilian Studios VSCO-2 Community Edition and VCSL (CC0 1.0).<br>
     FM6 engine: msfa from Dexed (Google Inc., Pascal Gauthier, Apache-2.0). The package also holds three JieLi AC79 SDK files, uboot.boot, cfg_tool.bin and eq_cfg_hw.bin (JieLi Technology, Apache-2.0). <a href="../../firmware/LICENSING.md" style="color:inherit">Licences</a>: <a href="../../firmware/LICENSE" style="color:inherit">GPL-3.0</a>, <a href="../../firmware/LICENSES/Apache-2.0.txt" style="color:inherit">Apache-2.0</a>, <a href="../../firmware/LICENSES/" style="color:inherit">all</a>.<br>
     M-VAVE and FM-1 are trademarks of their respective owners.<br>
-    <span data-t="license"></span> <a href="https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth" target="_blank" rel="noopener" style="color:inherit">github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth</a></p>
+    <span data-t="license"></span> <a href="https://github.com/jrdntnnr/sardab" target="_blank" rel="noopener" style="color:inherit">github.com/jrdntnnr/sardab</a></p>
 </main>
 <script type="module">
 // SPDX-License-Identifier: GPL-3.0-only
@@ -301,6 +302,9 @@ async function sha256hex(bytes) {
 
 // Only the user's unmodified official V15 is accepted for a return to stock.
 // The digest pins every file, loader and flash layout; filenames are not evidence.
+// The file goes to the device unchanged, through its own official loader, as M-VAVE's
+// updater sends it. head: the image range SARDAB compares with the device's boot
+// data (CHECK HEAD, firmware/src/ota.c) before it starts that loader.
 async function validateStockPackage(bytes) {
   if (bytes.length !== STOCK_V15_SIZE || await sha256hex(bytes) !== STOCK_V15_SHA256)
     throw new Error("Select the unmodified official FM-1 V15 file (FM-1.fwsc).");
@@ -309,7 +313,9 @@ async function validateStockPackage(bytes) {
       pkg.appBase !== 16384 || pkg.appOff !== 16672 || pkg.app.size !== STOCK_APP_SIZE ||
       !pkg.entries.some((e) => e.type === 100 && e.name === "ota.bin" && e.size === 19969))
     throw new Error("The official firmware has an unsupported FM-1 layout.");
-  return { product: pkg.product, image: logicalImage(bytes), sha256: STOCK_V15_SHA256 };
+  const head = pkg.flashEntry.dataOff;
+  return { product: pkg.product, image: logicalImage(bytes), sha256: STOCK_V15_SHA256,
+    head: { from: head, to: head + 0x4000 } };
 }
 
 // official V15 + Felucca app -> installable package (Uint8Array)
@@ -336,9 +342,15 @@ const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 const MAXDATA = 512;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const IS_OTA = (id) => /^ota-/i.test(id.model);
+// the update loaders on the handshake: SARDAB's own (firmware/loader/loader.c), which writes the
+// app area only, and the official one, which writes the whole package including the boot data and
+// reports the name in its update record (firmware/src/ota.c). Each package goes only to its own.
+const SARDAB_LOADER = "ota-FM-1_900";
+const STOCK_LOADER = "ota-FM-1_015";
 
 // errors carry a code the pages translate: notfound, model, stopped, noloader, lost, noreturn,
-// mismatch (detail: the identity the device reports), badreq
+// mismatch (detail: the identity the device reports), badreq, wrongloader (detail: the loader's
+// identity). A step-1 error has lastRead: the last image address the running firmware read.
 function fail(code, msg, detail = "") { const e = new Error(msg); e.code = code; e.detail = detail; return e; }
 
 function pack7(data) {
@@ -484,12 +496,12 @@ class Updater {
   // serve read requests until the device asks for one of the finish addresses; stops early
   // when the port disappears (lost: true) instead of waiting out idleMs
   async serve(link, image, finishAddr, idleMs, onProgress) {
-    let served = 0, last = Date.now();
+    let served = 0, last = Date.now(), lastRead = -1;
     for (;;) {
       const pkt = await link.read(1000);
       if (!pkt) {
-        if (link.lost) return { served, finished: false, lost: true };
-        if (Date.now() - last > idleMs) return { served, finished: false };
+        if (link.lost) return { served, finished: false, lost: true, lastRead };
+        if (Date.now() - last > idleMs) return { served, finished: false, lastRead };
         continue;
       }
       const r = parseRequest(pkt);
@@ -501,17 +513,19 @@ class Updater {
         continue;
       }
       if (r.len > MAXDATA || r.addr + r.len > image.length) throw fail("badreq", `bad request ${r.addr.toString(16)}+${r.len}`);
+      lastRead = r.addr;
       await sleep(10);
       if (!link.send(response(r.addr, Array.from(image.subarray(r.addr, r.addr + r.len)), r.fl))) {
-        return { served, finished: false, lost: true };
+        return { served, finished: false, lost: true, lastRead };
       }
       served++;
       if (onProgress) onProgress(served, r.addr);
     }
   }
 
-  // full install: running firmware -> loader -> new firmware
-  async install(image, product, onStep) {
+  // full install: running firmware -> loader -> new firmware; loader: the identity of the
+  // package's own loader (SARDAB_LOADER, STOCK_LOADER), any other one gets nothing
+  async install(image, product, onStep, loader = SARDAB_LOADER) {
     const step = onStep || (() => {});
     const dev = await this.find((id) => !IS_OTA(id));
     if (!dev) throw fail("notfound", "FM-1 not found (USB cable, and no other app using it?)");
@@ -522,11 +536,19 @@ class Updater {
     await sleep(2000);
     const s1 = await this.serve(dev.link, image, 0xE0000000, 8000, (n) => step("verify", n));
     dev.link.close();
-    if (!s1.finished) throw fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
+    if (!s1.finished) {
+      const e = fail(s1.lost ? "lost" : "stopped", `the device ${s1.lost ? "was disconnected" : "stopped"} after ${s1.served} requests: nothing was written`);
+      e.lastRead = s1.lastRead;
+      throw e;
+    }
     step("loader");
     await sleep(3000);
     const ota = await this.waitFor((id) => id.model === "ota-" + model, 30000, true);
     if (!ota) throw fail("noloader", "the update loader did not appear. Replug the USB cable and press Install again: the device stays in update mode until it is finished.");
+    if (ota.id.text !== loader) {
+      ota.link.close();
+      throw fail("wrongloader", `the device started ${ota.id.text}, this package goes only to ${loader}: nothing was sent to it`, ota.id.text);
+    }
     const s2 = await this.write(ota, image, step);
     if (!s2.finished) throw fail(s2.lost ? "lost" : "stopped", `the loader ${s2.lost ? "was disconnected" : "stopped"} after ${s2.served} requests. Replug and press Install again to resume.`);
     step("reboot");
@@ -550,9 +572,9 @@ class Updater {
 
   // resume: the device is already in update mode (loader) -> true when the write finished
   // waitMs (GHOULBOX): look for the loader that long (a page reloaded to reach it can list it a moment late); 0: once
-  async resume(image, onStep, product = null, waitMs = 0) {
+  async resume(image, onStep, product = null, waitMs = 0, loader = SARDAB_LOADER) {
     const model = product && product.split("_")[0];
-    const isOta = (id) => model ? id.model === "ota-" + model : IS_OTA(id);
+    const isOta = (id) => id.text === loader;
     const ota = waitMs ? await this.waitFor(isOta, waitMs) : await this.find(isOta);
     if (!ota) return false;
     const step = onStep || (() => {});
@@ -765,6 +787,9 @@ const TEXT = {
     stockNeedBackup: "書き込みモードからはバックアップできません。保存済みバックアップがある場合だけ、更新中断の再開にチェックしてください。",
     stockUnsupported: "このFeluccaは全体バックアップに未対応です。先に最新版をインストールしてください。",
     backup: "全体バックアップ保存中 ", stockError: "公式ファイルを確認できません: ",
+    loaderUnknown: "このインストーラーが知らない書き込みモードです。何も送っていません。この名前を添えて GitHub で報告してください: ",
+    loaderStock: "FM-1 は M-VAVE 公式の書き込みモードで待機しています。このモードには公式FM-1.fwscしか書き込めません。何も送っていません。先に「公式V15に戻す」を完了してください。",
+    stockHead: "FM-1 が CHECK HEAD で公式ファイルを拒否しました（FAILED -5）。起動データが V15 と異なります。何も書き込んでおらず、SARDAB はそのまま使えます。別の方法で戻そうとしないでください。上の FAILED -5 のリンクを読み、GitHub で報告してください。",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。", loadfail: "読み込めませんでした: ",
     start: "開始します", verify: "確認中", loader: "書き込みモードに切り替え中", write: "書き込み中",
     reboot: "再起動中", done: "完了しました", stopped: "途中で止まりました。USB を挿し直してもう一度押してください。",
@@ -798,6 +823,9 @@ const TEXT = {
     stockNeedBackup: "An update loader cannot export a backup. Only select resume if you already saved a complete backup.",
     stockUnsupported: "This Felucca does not support complete backups. Install the current Felucca first.",
     backup: "Saving complete backup ", stockError: "Cannot validate official firmware: ",
+    loaderUnknown: "The FM-1 is in an update mode this installer does not know. Nothing was sent. Please report it on GitHub with this name: ",
+    loaderStock: "The FM-1 is waiting in M-VAVE's official update mode, which only accepts the official FM-1.fwsc. Nothing was sent. Finish Return to official V15 first.",
+    stockHead: "The FM-1 refused the official file at CHECK HEAD (FAILED -5): its boot data differs from V15's. Nothing was written; SARDAB stays installed. Do not try other ways to return to stock. Open the FAILED -5 link above and report it on GitHub.",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
     start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
     reboot: "Restarting", done: "Done", stopped: "Stopped. Replug the USB cable and press Install again.",
@@ -831,7 +859,7 @@ const sayK = (k, arg = "") => { lastKey = k; lastArg = arg; $("status").textCont
 const say = (txt) => { lastKey = null; $("status").textContent = txt; };
 const log = (t) => { $("log").textContent += t + "\n"; };
 let image = null;
-const meta = {"version": "sardab-2.1-preview", "product": "FM-1_900", "pkg": "../../firmware/felucca-sardab-2.1-preview.fwsc"};
+const meta = {"version": "sardab-2.3-bayer-ui-preview", "product": "FM-1_900", "pkg": "../../firmware/felucca-sardab-2.3-bayer-ui-preview.fwsc"};
 
 let writing = false, stock = null, stockFileEpoch = 0, resumed = false;   // resumed: GHOULBOX, the page came back from a "reload"
 const lockInstaller = (on) => { writing = on; $("go").disabled = on || !image; $("stock-go").disabled = on || !stock; $("stock-file").disabled = on; $("stock-recovery").disabled = on; };
@@ -852,6 +880,8 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     if (resume) { resumed = true; sayK("resuming"); $("go").click(); }   // (GHOULBOX: back from the "reload" below)
   } catch (e) { sayK("loadfail", e.message); }
 })();
+
+const refuseLoader = id => sayK(id === STOCK_LOADER ? "loaderStock" : id === SARDAB_LOADER ? "loaderMelodee" : "loaderUnknown", id);
 
 $("go").addEventListener("click", async () => {
   if (writing) return;
@@ -882,7 +912,8 @@ $("go").addEventListener("click", async () => {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(image, step, meta.product)) ? "done" : "stopped");
+      if (ota.id.text !== SARDAB_LOADER) refuseLoader(ota.id.text);
+      else sayK((await up.resume(image, step, meta.product)) ? "done" : "stopped");
     } else {
       await up.install(image, meta.product, step);
     }
@@ -903,7 +934,8 @@ $("go").addEventListener("click", async () => {
       setTimeout(() => location.reload(), 500);
       return;
     }
-    if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
+    if (e && e.code === "wrongloader") refuseLoader(e.detail);
+    else if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
     else sayK("error", e && e.message);
     log(String(e && e.stack || e));
   }
@@ -922,7 +954,7 @@ $("stock-file").addEventListener("change", async () => {
 });
 function saveArchive(archive) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:"application/json"}));
-  const a = document.createElement("a"); a.href = url; a.download = `GHOULBOX-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const a = document.createElement("a"); a.href = url; a.download = `SARDAB-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function archiveInfo(a) {
@@ -931,8 +963,9 @@ function archiveInfo(a) {
   const engines = a[pos]; pos += 5;
   for (let i = 0; i < engines; i++) { const end = a.indexOf(0,pos); if (end < 0) throw new Error("Invalid INFO"); pos = end + 1; }
   const ext = a.slice(pos + 1);
-  const supported = /^FELUCCA /i.test(version) && ext[0] === 16 && ext[1] === 0x55 && ext[2] === 1 &&
-    ext[4] === 0x4d && ext[5] === 1 && ext[8] === 0x42 && ext[9] === 1 && (ext[10] & 1);
+  // Opaque archives depend on BACKUP capability, not the UI/motion protocol version.
+  const supported = /^(SARDAB|GHOULBOX|FELUCCA) /i.test(version) &&
+    ext[8] === 0x42 && ext[9] === 1 && !!(ext[10] & 1);
   return {version,supported};
 }
 $("stock-go").addEventListener("click", async () => {
@@ -944,12 +977,13 @@ $("stock-go").addEventListener("click", async () => {
     try { midi = await navigator.requestMIDIAccess({sysex:true}); } catch (e) { sayK("denied"); return; }
     const up = new Updater(midi, log);
     const step = (k, n) => { log(`${k} ${n ?? ""}`); if (["start","verify","loader","write","reboot","done"].includes(k)) sayK(k); if (k === "done") $("bar").value = 100; };
-    const loader = await up.find(id => id.model === "ota-FM-1");
+    const loader = await up.find(id => /^ota-/i.test(id.model));
     if (loader) {
       loader.link.close();
+      if (loader.id.text !== STOCK_LOADER) { refuseLoader(loader.id.text); return; }
       if (!$("stock-recovery").checked) { sayK("stockNeedBackup"); return; }
       if (!confirm(t("stockConfirm"))) return;
-      sayK(await up.resume(selected.image, step, selected.product) ? "done" : "stopped");
+      sayK(await up.resume(selected.image, step, selected.product, 0, STOCK_LOADER) ? "done" : "stopped");
     } else {
       const device = await up.find(id => id.model === "FM-1");
       if (!device) { sayK("notfound"); return; }
@@ -961,10 +995,12 @@ $("stock-go").addEventListener("click", async () => {
         (done,total) => sayK("backup", `${Math.round(done / Math.max(1,total) * 100)}%`));
       saveArchive(archive); link.close(); link = null;
       if (!confirm(t("stockConfirm"))) return;
-      await up.install(selected.image, selected.product, step);
+      await up.install(selected.image, selected.product, step, STOCK_LOADER);
     }
   } catch (e) {
-    if (e.code && TEXT[lang][e.code]) sayK(e.code,e.detail || ""); else sayK("error",e.message);
+    if (e.code === "stopped" && e.lastRead >= selected.head.from && e.lastRead < selected.head.to) sayK("stockHead");
+    else if (e.code === "wrongloader") refuseLoader(e.detail);
+    else if (e.code && TEXT[lang][e.code]) sayK(e.code,e.detail || ""); else sayK("error",e.message);
     log(String(e.stack || e));
   } finally { if (link) link.close(); lockInstaller(false); }
 });

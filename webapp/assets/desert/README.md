@@ -1,7 +1,9 @@
 # Dungeons of the Desert — optional sample banks
 
-These small, mono banks complement the built-in modeled desert presets. Uploading
-firmware does not install them. In the web editor's Samples tab, choose a bank in
+These small, mono banks complement the built-in modeled desert presets. The oud
+and ney-air recordings are also built into the firmware as the SAMPLE sets OUD
+(SET 3) and NEY (SET 2, looped), so the USR slots stay free for the qanun and the
+tar. Uploading firmware does not install the banks. In the web editor's Samples tab, choose a bank in
 the desired USR slot's dropdown, press **Prepare**, preview the notes, then **Upload**. Upload
 replaces only the selected USR slot, after confirmation. Back up your existing
 samples first if you want to keep them. On a SAMPLE track choose SET USR1 (Oud),

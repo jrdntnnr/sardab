@@ -97,6 +97,6 @@ assert a pixel-for-pixel round trip. Target instruction budgets cover the new
 CAVE/TORCH generator as well as the existing audio paths. Static estimates and
 host CPU tests do not establish worst-case hardware timing with twelve voices.
 
-See [current build results](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/INTEGRATION-STATUS.md) and
-[installation instructions](https://github.com/jrdntnnr/ghoulbox-fm1-dungeon-synth/blob/microtonal/docs/FLASHING.md). Existing screen-layout audit
+See [current build results](INTEGRATION-STATUS.md) and
+[installation instructions](FLASHING.md). Existing screen-layout audit
 findings and physical-device validation are still outstanding.

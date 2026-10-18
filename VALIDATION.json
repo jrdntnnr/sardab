@@ -1,0 +1,63 @@
+{
+  "native_suites": {
+    "ui_test": 0,
+    "desert_ui_test": 0,
+    "regress": 0,
+    "ota_test": 0,
+    "ldr_test": 0
+  },
+  "base_build_evidence": "build/assessment/desert-ui/native-checks.json",
+  "target_budget": "pass",
+  "audio_references_unchanged": 158,
+  "emulator_native_matching_frames": 88200,
+  "web_protocol": "pass (current compiled descriptors)",
+  "emulator_page": "pass",
+  "browser": {
+    "audioPeak": 0.1085205078125,
+    "focus": {
+      "on": true,
+      "visible": true,
+      "w": 1000
+    },
+    "emuMobile": {
+      "width": 390,
+      "scroll": 390,
+      "bg": "rgb(0, 0, 0)",
+      "brand": "sardab"
+    },
+    "editorMobile": {
+      "width": 390,
+      "scroll": 390,
+      "bg": "rgb(0, 0, 0)",
+      "brand": "sardab"
+    },
+    "manualMobile": {
+      "width": 390,
+      "scroll": 390,
+      "bg": "rgb(0, 0, 0)",
+      "brand": "sardab"
+    },
+    "installerMobile": {
+      "width": 390,
+      "scroll": 390,
+      "bg": "rgb(0, 0, 0)",
+      "brand": "sardab"
+    },
+    "pageErrors": [],
+    "failedResources": []
+  },
+  "ui_audit": {
+    "baseline": {
+      "layout": 244,
+      "alignment": 912
+    },
+    "current": {
+      "layout": 244,
+      "alignment": 912
+    },
+    "invisible_ink": 0,
+    "nonneutral_grey_mono_pixels": 0
+  },
+  "hardware_tested": false,
+  "live_browser_tested": true
+}
