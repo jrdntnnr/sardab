@@ -1578,44 +1578,31 @@ static void draw(int s)
         setup_show("TURN RIGHT", "ALGORITHM");
         return;
     }
-    if (s == S_SPLASH) {                          /* the power-on splash (main.c, before the UI): its lines, the version
-                                                   * shown FELUCCA_VERSION (run_tests.sh: src/felucca.c's) */
-        static const char WANT[] = "Felucca|" FELUCCA_VERSION "|H\xFCgelton Instruments|with community";
+    if (s == S_SPLASH) {
+        static const char WANT[] = "سرداب|DUNGEON SYNTH";
+        const uint32_t x0 = (240 - SARDAB_WORD_W) / 2;
+        const uint32_t y0 = 80 + (64 - SARDAB_WORD_H) / 2;
+        uint32_t bad = 0;
+        const uint16_t *ink;
         splash_seen[0] = 0;
         in_splash = 1;
         draw_splash();
         in_splash = 0;
-        {   /* the square whole on the screen (176 x 176 at 32,32, more than the canvas): its edges and square corners
-             * RAISE, BG just outside; its text's ink 16 px in from the left and the top (the bottom: AL_B, the hook) */
-            const int32_t q0 = 32, q1 = 32 + 176 - 1;
-            uint16_t bg = host_screen[0], ra = host_screen[(uint32_t)(q0 + 1) * 240u + (uint32_t)q0 + 1];
-            int32_t i, x, y, ix = 999, iy = 999, bad = ra == bg;
-            for (i = q0 - 1; i <= q1 + 1; i++) {
-                int32_t in = i >= q0 && i <= q1;
-                bad |= host_screen[(uint32_t)(q0 - 1) * 240u + (uint32_t)i] != bg || host_screen[(uint32_t)(q1 + 1) * 240u + (uint32_t)i] != bg
-                    || host_screen[(uint32_t)i * 240u + (uint32_t)(q0 - 1)] != bg || host_screen[(uint32_t)i * 240u + (uint32_t)(q1 + 1)] != bg;
-                if (in)
-                    bad |= host_screen[(uint32_t)q0 * 240u + (uint32_t)i] != ra || host_screen[(uint32_t)q1 * 240u + (uint32_t)i] != ra
-                        || host_screen[(uint32_t)i * 240u + (uint32_t)q0] != ra || host_screen[(uint32_t)i * 240u + (uint32_t)q1] != ra;
+        ink = ramp(T_THEME, T_BG);
+        /* Every wordmark pixel and its surrounding blank area, as actually
+         * blitted: catches cropping, stale offsets, wrong tint and nibble order. */
+        for (uint32_t y = 0; y < 148; y++)
+            for (uint32_t x = 0; x < 240; x++) {
+                uint32_t a = 0;
+                if (x >= x0 && x < x0 + SARDAB_WORD_W && y >= y0 && y < y0 + SARDAB_WORD_H) {
+                    uint32_t k = (y - y0) * SARDAB_WORD_W + x - x0;
+                    a = (SARDAB_WORD_COVERAGE[k >> 1] >> ((k & 1) ? 0 : 4)) & 15u;
+                }
+                bad += host_screen[y * 240 + x] != ink[a];
             }
-            for (y = q0; y <= q1; y++)
-                for (x = q0; x <= q1; x++)
-                    if (host_screen[(uint32_t)y * 240u + (uint32_t)x] != ra) {
-                        if (x - q0 < ix) ix = x - q0;
-                        if (y - q0 < iy) iy = y - q0;
-                    }
-            if (bad || ix != 16 || iy != 16) {
-                if (rep) fprintf(rep, "FIND %-26s the splash square not whole (edges %s) or its text not 16 px in (left %d, top %d)\n",
-                                 cur_name, bad ? "off" : "ok", (int)ix, (int)iy);
-                nfind++;
-            }
-        }
-        if (strcmp(splash_seen, WANT)) {
-            if (rep) fprintf(rep, "FIND %-26s the splash shows '%s', not '%s'\n", cur_name, splash_seen, WANT);
+        if (bad || strcmp(splash_seen, WANT)) {
+            if (rep) fprintf(rep, "FIND %-26s Persian splash: %u wrong pixels, text '%s'\n", cur_name, bad, splash_seen);
             nfind++;
-        } else {
-            static uint8_t said;
-            if (!said++) printf("ui_render: the splash shows the version " FELUCCA_VERSION " (FELUCCA_VERSION) and its lines\n");
         }
         return;
     }

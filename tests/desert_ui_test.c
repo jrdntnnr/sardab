@@ -42,6 +42,12 @@ static void check_pattern_redraw(void)
 int main(void)
 {
     check_pattern_redraw();
+    for (uint32_t p = 0; p < NPALETTES; p++) {
+        uint32_t before = nfind;
+        setup(S_SPLASH); pal(p); draw(S_SPLASH);
+        assert(nfind == before);
+        assert(shown("سرداب") && shown("DUNGEON SYNTH"));
+    }
     static const char *const third[12] = {"E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#"};
     for (uint32_t root = 0; root < 12; root++) {
         char want[24];

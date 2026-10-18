@@ -1,6 +1,6 @@
 # Flashing the current FM-1 development build
 
-Rebuilt on 2026-10-18 as **SARDAB 2.3**, with the [blue/red Bayer theme](BAYER-UI.md), [DESERT UI improvements](DESERT-UI.md), Ghoulbox 2.3.2 DREAM/RING,
+Rebuilt on 2026-10-18 as **SARDAB 2.3**, with the [Persian splash](PERSIAN-SPLASH.md), [blue/red Bayer theme](BAYER-UI.md), [DESERT UI improvements](DESERT-UI.md), Ghoulbox 2.3.2 DREAM/RING,
 maqam-aware generation, the smaller FM6 table, audio DMA acknowledgement and
 stock-restore corrections. Existing DESERT instruments, tuning, velocity,
 inserts and 48 kHz USB audio remain. BLE is excluded.
@@ -23,7 +23,7 @@ handling changed. Keep a complete backup from before updating if you may downgra
    running mode; the installer requests update mode itself.
 3. In **Chrome or Edge**, open
    <http://127.0.0.1:8792/webapp/installer/>. This local page contains
-   **sardab-2.3-bayer-ui-preview**. Check that exact label before installing.
+   **sardab-2.3-persian-splash-preview**. Check that exact label before installing.
    The [public installer](https://jrdntnnr.github.io/sardab/webapp/installer/)
    also serves this build; check the same exact label there.
 4. Click **Install** and allow **MIDI / SysEx** access when prompted.

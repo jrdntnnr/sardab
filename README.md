@@ -6,9 +6,10 @@ A sardab is the cellar under a Persian house where the heat does not reach.
 This firmware is GHOULBOX (a dungeon-synth fork of Felucca) with maqam tuning,
 Arabic rhythm, oud and ney recordings, and the sound of stone rooms.
 
-Version SARDAB 2.1. One FM-1 has run it. Install at your own risk.
+Version SARDAB 2.3 development preview. The latest build is host/emulator-tested;
+physical FM-1 validation is pending. [Build status](docs/INTEGRATION-STATUS.md).
 
-![boot, HOME on DESERT OUD, PRESETS, MENU](docs/sardab-2.1.png)
+![Persian سرداب splash, DESERT OUD, DESERT presets and DISPLAY menu in the current SARDAB palette](docs/sardab-2.3.png)
 
 ## Install
 

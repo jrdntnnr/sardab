@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The README's strip (docs/sardab-2.1.png): boot, HOME on DESERT OUD, PRESETS, MENU in the SARDAB palette, from the
+/* The README's strip (docs/sardab-2.3.png): boot, HOME on DESERT OUD, PRESETS, MENU in the SARDAB palette, from the
  * real drawing code on tests/ui_test.c's stubs. Writes OUTDIR/{boot,home,presets,menu}.ppm (240 x 240); the strip is
- * the four at 2x on a dark ground, 24 px apart.
- *   cc -O1 -w '-DFELUCCA_VERSION="SARDAB 2.1"' -Ibuild/gen -Ifirmware/src -Itests -o build/host/readme_shots tests/readme_shots.c -lm
- *   build/host/readme_shots build/shots */
+ * the four at 2x on a dark ground, 16 px apart (tools/render_readme.py).
+ *   cc -O1 -w '-DFELUCCA_VERSION="SARDAB 2.3"' -Ibuild/gen -Ifirmware/src -Itests -o build/host/readme_shots tests/readme_shots.c -lm
+ *   build/host/readme_shots build/shots
+ *   python3 tools/render_readme.py build/shots */
 #define UI_TEST_NO_MAIN 1
 #include "ui_test.c"
 
@@ -48,10 +49,8 @@ int main(int argc, char **argv)
     ui_power_on();
     settings.palette = UI_SARDAB_INDEX; palette_set(UI_SARDAB_INDEX);
 
-    /* boot, as main.c fm1_main draws it */
-    lcd_fill(0, 0, 240, 240, T_BG);
-    draw_text_box(0, 92, 240, &AF_L, "SARDAB", T_THEME, 1);
-    draw_text_box(0, 136, 240, &AF_S, "DUNGEON SYNTH", T_MID, 1);
+    /* The actual shared hardware/emulator splash. */
+    draw_splash();
     snprintf(path, sizeof path, "%s/boot.ppm", dir); ppm(path);
 
     /* HOME: DESERT OUD on track 1, a note sounding for the scope */
@@ -70,7 +69,8 @@ int main(int argc, char **argv)
     frame(); frame();
     snprintf(path, sizeof path, "%s/home.ppm", dir); ppm(path);
 
-    /* PRESETS at DESERT OUD */
+    /* PRESETS at DESERT OUD in the DESERT section */
+    list_set(1u + CAT_DESERT);
     go_page(GR_BROWSE);
     frame(); frame();
     snprintf(path, sizeof path, "%s/presets.ppm", dir); ppm(path);

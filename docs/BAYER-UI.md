@@ -1,6 +1,7 @@
 # SARDAB: AmbientZero colours and Bayer texture
 
-Local build **sardab-2.3-bayer-ui-preview**, 18 October 2026.
+Bayer build **sardab-2.3-bayer-ui-preview**, 18 October 2026.
+The current [Persian splash build](PERSIAN-SPLASH.md) includes this theme.
 
 ![Actual firmware renders, 240 × 240 per screen, enlarged 2×](sardab-ui/bayer-ui-2026-10-18.png)
 
